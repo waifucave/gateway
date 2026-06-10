@@ -1,0 +1,287 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "step-3-5-flash",
+    "displayName": "Step 3.5 Flash",
+    "company": "StepFun",
+    "routes": [
+      {
+        "providerId": "stepfun",
+        "modelId": "step-3.5-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.stepfun.ai/v1",
+          "endpoint": "/chat/completions",
+          "alternateChinaBaseUrl": "https://api.stepfun.com/v1"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "stepfun/step-3.5-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 16384,
+          "pricing": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.3,
+            "cachedInputPerMTok": 0.02
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 256000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "unverified",
+        "values": [
+          "low",
+          "high"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.1,
+        "outputPerMTok": 0.3,
+        "cachedInputPerMTok": 0.02
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.stepfun.ai/docs/en/guides/models/step-3.5-flash",
+        "https://platform.stepfun.ai/docs/en/api-reference/chat/chat-completion-create",
+        "https://platform.stepfun.ai/docs/en/guides/developer/openai",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "step-3-7-flash",
+    "displayName": "Step 3.7 Flash",
+    "company": "StepFun",
+    "routes": [
+      {
+        "providerId": "stepfun",
+        "modelId": "step-3.7-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.stepfun.ai/v1",
+          "endpoint": "/chat/completions",
+          "alternateChinaBaseUrl": "https://api.stepfun.com/v1"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "stepfun/step-3.7-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 256000,
+          "maxOutputTokens": 256000,
+          "pricing": {
+            "inputPerMTok": 0.2,
+            "outputPerMTok": 1.15,
+            "cachedInputPerMTok": 0.04
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 256000,
+      "maxOutputTokens": 256000
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 256000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "verified",
+        "values": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.2,
+        "outputPerMTok": 1.15,
+        "cachedInputPerMTok": 0.04
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.stepfun.ai/docs/en/guides/models/step-3.7-flash",
+        "https://platform.stepfun.ai/docs/en/api-reference/chat/chat-completion-create",
+        "https://platform.stepfun.ai/docs/en/guides/developer/openai",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

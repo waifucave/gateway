@@ -1,0 +1,565 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "glm-4-5-air",
+    "displayName": "GLM 4.5 Air",
+    "company": "Z.AI",
+    "routes": [
+      {
+        "providerId": "zai",
+        "modelId": "glm-4.5-air",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.z.ai/api/paas/v4",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "z-ai/glm-4.5-air",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 131072,
+          "maxOutputTokens": 131070,
+          "pricing": {
+            "inputPerMTok": 0.125,
+            "outputPerMTok": 0.85,
+            "cachedInputPerMTok": 0.06
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 128000,
+      "maxOutputTokens": 96000
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 96000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.125,
+        "outputPerMTok": 0.85,
+        "cachedInputPerMTok": 0.06
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.z.ai/api-reference/llm/chat-completion",
+        "https://docs.z.ai/guides/develop/http/introduction",
+        "https://docs.z.ai/guides/develop/openai/python",
+        "https://docs.z.ai/guides/overview/pricing",
+        "https://docs.z.ai/guides/llm/glm-4.5",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "glm-4-7",
+    "displayName": "GLM 4.7",
+    "company": "Z.AI",
+    "routes": [
+      {
+        "providerId": "zai",
+        "modelId": "glm-4.7",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.z.ai/api/paas/v4",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "z-ai/glm-4.7",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 202752,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 0.4,
+            "outputPerMTok": 1.75,
+            "cachedInputPerMTok": 0.08
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 200000,
+      "maxOutputTokens": 128000
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 128000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.4,
+        "outputPerMTok": 1.75,
+        "cachedInputPerMTok": 0.08
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.z.ai/api-reference/llm/chat-completion",
+        "https://docs.z.ai/guides/develop/http/introduction",
+        "https://docs.z.ai/guides/develop/openai/python",
+        "https://docs.z.ai/guides/overview/pricing",
+        "https://docs.z.ai/guides/llm/glm-4.7",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "glm-5",
+    "displayName": "GLM 5",
+    "company": "Z.AI",
+    "routes": [
+      {
+        "providerId": "zai",
+        "modelId": "glm-5",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.z.ai/api/paas/v4",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "z-ai/glm-5",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 202752,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 0.6,
+            "outputPerMTok": 1.92,
+            "cachedInputPerMTok": 0.12
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 200000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.6,
+        "outputPerMTok": 1.92,
+        "cachedInputPerMTok": 0.12
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.z.ai/api-reference/llm/chat-completion",
+        "https://docs.z.ai/guides/develop/http/introduction",
+        "https://docs.z.ai/guides/develop/openai/python",
+        "https://docs.z.ai/guides/overview/pricing",
+        "https://docs.z.ai/guides/llm/glm-5",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "glm-5-1",
+    "displayName": "GLM 5.1",
+    "company": "Z.AI",
+    "routes": [
+      {
+        "providerId": "zai",
+        "modelId": "glm-5.1",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.z.ai/api/paas/v4",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "z-ai/glm-5.1",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 202752,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 0.98,
+            "outputPerMTok": 3.08,
+            "cachedInputPerMTok": 0.182
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "parallel_tool_calls",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 200000,
+      "maxOutputTokens": 128000
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 128000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.98,
+        "outputPerMTok": 3.08,
+        "cachedInputPerMTok": 0.182
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.z.ai/api-reference/llm/chat-completion",
+        "https://docs.z.ai/guides/develop/http/introduction",
+        "https://docs.z.ai/guides/develop/openai/python",
+        "https://docs.z.ai/guides/overview/pricing",
+        "https://docs.z.ai/guides/llm/glm-5.1",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

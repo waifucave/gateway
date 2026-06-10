@@ -1,0 +1,312 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "mistral-small-3-2-24b",
+    "displayName": "Mistral Small 3.2 24B",
+    "company": "Mistral AI",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "mistralai/mistral-small-3.2-24b-instruct",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 128000,
+          "maxOutputTokens": 16384,
+          "pricing": {
+            "inputPerMTok": 0.075,
+            "outputPerMTok": 0.2,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 128000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "any",
+          "required",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "explicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "promptCacheKey": {
+        "type": "string",
+        "wireName": "prompt_cache_key",
+        "confidence": "verified"
+      },
+      "safePrompt": {
+        "type": "boolean",
+        "wireName": "safe_prompt",
+        "confidence": "verified",
+        "default": false
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": true,
+      "availability": "deprecated April 30, 2026; current post-deprecation native availability unverified",
+      "sources": [
+        "https://docs.mistral.ai/models/model-cards/mistral-small-3-2-25-06",
+        "https://docs.mistral.ai/api/endpoint/chat",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "mistral-small-4",
+    "displayName": "Mistral Small 4",
+    "company": "Mistral AI",
+    "routes": [
+      {
+        "providerId": "mistral",
+        "modelId": "mistral-small-2603",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.mistral.ai/v1",
+          "endpoint": "/v1/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "mistralai/mistral-small-2603",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 0.15,
+            "outputPerMTok": 0.6,
+            "cachedInputPerMTok": 0.015
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 256000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "any",
+          "required",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "explicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "verified",
+        "values": [
+          "none",
+          "high"
+        ]
+      },
+      "promptCacheKey": {
+        "type": "string",
+        "wireName": "prompt_cache_key",
+        "confidence": "verified"
+      },
+      "safePrompt": {
+        "type": "boolean",
+        "wireName": "safe_prompt",
+        "confidence": "verified",
+        "default": false
+      }
+    },
+    "constraints": [
+      {
+        "id": "reasoning-roundtrip",
+        "when": {
+          "param": "reasoning.effort",
+          "eq": "high"
+        },
+        "then": {
+          "force": {
+            "preserveAssistantThinkingChunks": true
+          }
+        },
+        "source": "https://docs.mistral.ai/studio-api/conversations/reasoning"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.15,
+        "outputPerMTok": 0.6,
+        "cachedInputPerMTok": 0.015
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
+        "https://docs.mistral.ai/models/model-selection-guide",
+        "https://docs.mistral.ai/api/endpoint/chat",
+        "https://docs.mistral.ai/studio-api/conversations/reasoning",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "conflicting"
+    }
+  }
+]

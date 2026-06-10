@@ -1,0 +1,311 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "nemotron-3-super",
+    "displayName": "Nemotron 3 Super",
+    "company": "NVIDIA",
+    "routes": [
+      {
+        "providerId": "nvidia",
+        "modelId": "nvidia/nemotron-3-super-120b-a12b",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://integrate.api.nvidia.com/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "nvidia/nemotron-3-super-120b-a12b",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.45,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 32768
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": false,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified",
+        "max": 1,
+        "default": 1
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified",
+        "max": 1,
+        "default": 0.95
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 32768
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "reasoning_budget",
+        "confidence": "verified",
+        "min": -1,
+        "max": 32768,
+        "default": 16384
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "verified",
+        "values": [
+          "none",
+          "low",
+          "high"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.09,
+        "outputPerMTok": 0.45,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b",
+        "https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b-infer",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "nemotron-3-ultra",
+    "displayName": "Nemotron 3 Ultra",
+    "company": "NVIDIA",
+    "routes": [
+      {
+        "providerId": "nvidia",
+        "modelId": "nvidia/nemotron-3-ultra-550b-a55b",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://integrate.api.nvidia.com/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "nvidia/nemotron-3-ultra-550b-a55b",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 16384,
+          "pricing": {
+            "inputPerMTok": 0.5,
+            "outputPerMTok": 2.5,
+            "cachedInputPerMTok": 0.15
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 32768
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": false,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified",
+        "max": 1,
+        "default": 1
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified",
+        "max": 1,
+        "default": 0.95
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 32768
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "reasoning_budget",
+        "confidence": "verified",
+        "min": -1,
+        "max": 32768,
+        "default": 16384
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "verified",
+        "values": [
+          "none",
+          "medium",
+          "high"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.5,
+        "outputPerMTok": 2.5,
+        "cachedInputPerMTok": 0.15
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b",
+        "https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-ultra-550b-a55b-infer",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

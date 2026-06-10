@@ -1,0 +1,413 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "kimi-k2-5",
+    "displayName": "Kimi K2.5",
+    "company": "Moonshot AI",
+    "routes": [
+      {
+        "providerId": "moonshot",
+        "modelId": "kimi-k2.5",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.moonshot.ai/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "moonshotai/kimi-k2.5",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 262144,
+          "pricing": {
+            "inputPerMTok": 0.4,
+            "outputPerMTok": 1.9,
+            "cachedInputPerMTok": 0.09
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 262144
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_completion_tokens",
+        "confidence": "verified",
+        "max": 262144
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified",
+        "maxItems": 5
+      },
+      "n": {
+        "type": "int",
+        "wireName": "n",
+        "confidence": "verified",
+        "default": 1
+      },
+      "presencePenalty": {
+        "type": "number",
+        "wireName": "presence_penalty",
+        "confidence": "verified",
+        "default": 0
+      },
+      "frequencyPenalty": {
+        "type": "number",
+        "wireName": "frequency_penalty",
+        "confidence": "verified",
+        "default": 0
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified",
+        "default": true
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "verified",
+        "values": [
+          "text",
+          "json_object",
+          "json_schema"
+        ],
+        "default": "text"
+      }
+    },
+    "constraints": [
+      {
+        "id": "thinking-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.kimi.ai/docs/models"
+      },
+      {
+        "id": "assistant-prefill-json-object",
+        "when": {
+          "param": "assistantPrefill",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "responseFormat:json_object"
+          ]
+        },
+        "source": "https://platform.kimi.ai/docs/api/partial"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.6,
+        "outputPerMTok": 3,
+        "cachedInputPerMTok": 0.1
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/api/chat",
+        "https://platform.kimi.ai/docs/api/tool-use",
+        "https://platform.kimi.ai/docs/api/partial",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "kimi-k2-6",
+    "displayName": "Kimi K2.6",
+    "company": "Moonshot AI",
+    "routes": [
+      {
+        "providerId": "moonshot",
+        "modelId": "kimi-k2.6",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.moonshot.ai/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "moonshotai/kimi-k2.6",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 262142,
+          "pricing": {
+            "inputPerMTok": 0.68,
+            "outputPerMTok": 3.41,
+            "cachedInputPerMTok": 0.34
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "parallel_tool_calls",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 262144
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_completion_tokens",
+        "confidence": "verified",
+        "max": 262144
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified",
+        "maxItems": 5
+      },
+      "n": {
+        "type": "int",
+        "wireName": "n",
+        "confidence": "verified",
+        "default": 1
+      },
+      "presencePenalty": {
+        "type": "number",
+        "wireName": "presence_penalty",
+        "confidence": "verified",
+        "default": 0
+      },
+      "frequencyPenalty": {
+        "type": "number",
+        "wireName": "frequency_penalty",
+        "confidence": "verified",
+        "default": 0
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified",
+        "default": true
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "verified",
+        "values": [
+          "text",
+          "json_object",
+          "json_schema"
+        ],
+        "default": "text"
+      }
+    },
+    "constraints": [
+      {
+        "id": "thinking-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart"
+      },
+      {
+        "id": "assistant-prefill-json-object",
+        "when": {
+          "param": "assistantPrefill",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "responseFormat:json_object"
+          ]
+        },
+        "source": "https://platform.kimi.ai/docs/api/partial"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.95,
+        "outputPerMTok": 4,
+        "cachedInputPerMTok": 0.16
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.kimi.ai/docs/models",
+        "https://platform.kimi.ai/docs/api/chat",
+        "https://platform.kimi.ai/docs/api/tool-use",
+        "https://platform.kimi.ai/docs/api/partial",
+        "https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

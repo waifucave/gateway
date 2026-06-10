@@ -1,0 +1,336 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "grok-4-20",
+    "displayName": "Grok 4.20",
+    "company": "xAI",
+    "routes": [
+      {
+        "providerId": "xai",
+        "modelId": "grok-4.20-0309-reasoning",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.x.ai/v1",
+          "endpoint": "/chat/completions",
+          "aliases": [
+            "grok-4.20",
+            "grok-4.20-reasoning"
+          ]
+        }
+      },
+      {
+        "providerId": "xai",
+        "modelId": "grok-4.20-0309-non-reasoning",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.x.ai/v1",
+          "endpoint": "/chat/completions",
+          "aliases": [
+            "grok-4.20-non-reasoning"
+          ]
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "x-ai/grok-4.20",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 2000000,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 1.25,
+            "outputPerMTok": 2.5,
+            "cachedInputPerMTok": 0.2
+          },
+          "modalities": [
+            "text",
+            "image",
+            "file"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "logprobs": {
+        "type": "boolean",
+        "wireName": "logprobs",
+        "confidence": "unverified"
+      },
+      "topLogprobs": {
+        "type": "int",
+        "wireName": "top_logprobs",
+        "confidence": "unverified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "logprobs-ignored-grok-4-20-plus",
+        "when": {
+          "param": "topLogprobs",
+          "gt": 0
+        },
+        "then": {
+          "drop": [
+            "logprobs",
+            "topLogprobs"
+          ]
+        },
+        "source": "https://docs.x.ai/developers/models"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 2.5,
+        "cachedInputPerMTok": 0.2
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.x.ai/developers/models/grok-4.20",
+        "https://docs.x.ai/developers/pricing",
+        "https://docs.x.ai/developers/model-capabilities/legacy/chat-completions",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "grok-4-3",
+    "displayName": "Grok 4.3",
+    "company": "xAI",
+    "routes": [
+      {
+        "providerId": "xai",
+        "modelId": "grok-4.3",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.x.ai/v1",
+          "endpoint": "/chat/completions",
+          "aliases": [
+            "grok-4.3-latest",
+            "grok-latest"
+          ]
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "x-ai/grok-4.3",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 1.25,
+            "outputPerMTok": 2.5,
+            "cachedInputPerMTok": 0.2
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified",
+        "max": 0
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning_effort",
+        "confidence": "verified",
+        "values": [
+          "none",
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "low"
+      }
+    },
+    "constraints": [
+      {
+        "id": "reasoning-no-penalties-or-stop",
+        "when": {
+          "param": "reasoning.effort",
+          "neq": "none"
+        },
+        "then": {
+          "forbid": [
+            "presencePenalty",
+            "frequencyPenalty",
+            "stopSequences"
+          ]
+        },
+        "source": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 2.5,
+        "cachedInputPerMTok": 0.2
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://docs.x.ai/developers/models/grok-4.3",
+        "https://docs.x.ai/developers/pricing",
+        "https://docs.x.ai/developers/model-capabilities/legacy/chat-completions",
+        "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

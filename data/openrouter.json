@@ -1,0 +1,129 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "owl-alpha",
+    "displayName": "Owl Alpha",
+    "company": "OpenRouter",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "openrouter/owl-alpha",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048756,
+          "maxOutputTokens": 262144,
+          "pricing": {
+            "inputPerMTok": 0,
+            "outputPerMTok": 0,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "logit_bias",
+            "max_tokens",
+            "presence_penalty",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048756,
+      "maxOutputTokens": 262144
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 262144
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "verified"
+      },
+      "logitBias": {
+        "type": "map",
+        "wireName": "logit_bias",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "OpenRouter-native alpha model; alpha models may churn",
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://openrouter.ai/api/v1/models/openrouter/owl-alpha/endpoints"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]
