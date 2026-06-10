@@ -1,0 +1,418 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "mimo-v2-flash",
+    "displayName": "MiMo V2 Flash",
+    "company": "Xiaomi",
+    "routes": [
+      {
+        "providerId": "xiaomi",
+        "modelId": "mimo-v2-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.xiaomimimo.com/v1",
+          "endpoint": "/chat/completions",
+          "anthropicEndpoint": "https://api.xiaomimimo.com/anthropic/v1/messages"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "xiaomi/mimo-v2-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.1,
+            "outputPerMTok": 0.3,
+            "cachedInputPerMTok": 0.01
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.1,
+        "outputPerMTok": 0.3,
+        "cachedInputPerMTok": 0.01
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "available",
+      "sources": [
+        "https://platform.xiaomimimo.com/docs/en-US/quick-start/model",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/openai-api",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/anthropic-api",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "mimo-v2-5",
+    "displayName": "MiMo V2.5",
+    "company": "Xiaomi",
+    "routes": [
+      {
+        "providerId": "xiaomi",
+        "modelId": "mimo-v2.5",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.xiaomimimo.com/v1",
+          "endpoint": "/chat/completions",
+          "anthropicEndpoint": "https://api.xiaomimimo.com/anthropic/v1/messages"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "xiaomi/mimo-v2.5",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 0.14,
+            "outputPerMTok": 0.28,
+            "cachedInputPerMTok": 0.0028
+          },
+          "modalities": [
+            "text",
+            "image",
+            "audio",
+            "video"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "audio",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 128000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.14,
+        "outputPerMTok": 0.28,
+        "cachedInputPerMTok": 0.0028
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "available",
+      "sources": [
+        "https://platform.xiaomimimo.com/docs/en-US/quick-start/model",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/openai-api",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/anthropic-api",
+        "https://platform.xiaomimimo.com/docs/en-US/news/v2.5-open-sourced",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "mimo-v2-5-pro",
+    "displayName": "MiMo V2.5 Pro",
+    "company": "Xiaomi",
+    "routes": [
+      {
+        "providerId": "xiaomi",
+        "modelId": "mimo-v2.5-pro",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.xiaomimimo.com/v1",
+          "endpoint": "/chat/completions",
+          "anthropicEndpoint": "https://api.xiaomimimo.com/anthropic/v1/messages"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "xiaomi/mimo-v2.5-pro",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 0.435,
+            "outputPerMTok": 0.87,
+            "cachedInputPerMTok": 0.0036
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 128000
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 128000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.435,
+        "outputPerMTok": 0.87,
+        "cachedInputPerMTok": 0.0036
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "available",
+      "sources": [
+        "https://platform.xiaomimimo.com/docs/en-US/quick-start/model",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/openai-api",
+        "https://platform.xiaomimimo.com/docs/en-US/api/chat/anthropic-api",
+        "https://platform.xiaomimimo.com/docs/en-US/news/v2.5-open-sourced",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

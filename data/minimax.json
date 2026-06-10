@@ -1,0 +1,287 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "minimax-m2-7",
+    "displayName": "M2.7",
+    "company": "MiniMax",
+    "routes": [
+      {
+        "providerId": "minimax",
+        "modelId": "MiniMax-M2.7",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.minimax.io/v1",
+          "endpoint": "/chat/completions",
+          "note": "M2.x thinking cannot be disabled; OpenAI-compatible output may include think tags unless reasoning_split is used."
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "minimax/minimax-m2.7",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 204800,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 0.27,
+            "outputPerMTok": 1.08,
+            "cachedInputPerMTok": 0.054
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 204800,
+      "maxOutputTokens": 204800
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 204800
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      },
+      "minimax.reasoningSplit": {
+        "type": "boolean",
+        "wireName": "reasoning_split",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.27,
+        "outputPerMTok": 1.08,
+        "cachedInputPerMTok": 0.054
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.minimax.io/docs/api-reference/models/openai/list-models",
+        "https://platform.minimax.io/docs/api-reference/text-openai-api",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "minimax-m3",
+    "displayName": "M3",
+    "company": "MiniMax",
+    "routes": [
+      {
+        "providerId": "minimax",
+        "modelId": "MiniMax-M3",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://api.minimax.io/v1",
+          "endpoint": "/chat/completions",
+          "note": "thinking supports adaptive/disabled and reasoning_split."
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "minimax/minimax-m3",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 512000,
+          "pricing": {
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 1.2,
+            "cachedInputPerMTok": 0.06
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 1000000
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 1000000
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "thinking.type",
+        "confidence": "verified"
+      },
+      "minimax.reasoningSplit": {
+        "type": "boolean",
+        "wireName": "reasoning_split",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.3,
+        "outputPerMTok": 1.2,
+        "cachedInputPerMTok": 0.06
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "sources": [
+        "https://platform.minimax.io/docs/api-reference/models/openai/list-models",
+        "https://platform.minimax.io/docs/api-reference/text-openai-api",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]

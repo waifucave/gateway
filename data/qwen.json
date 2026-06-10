@@ -1,0 +1,777 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-6-flash",
+    "displayName": "Qwen3.6 Flash",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3.6-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.6-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.1875,
+            "outputPerMTok": 1.125,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "international-available",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://www.alibabacloud.com/help/en/model-studio/vision-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-6-max-preview",
+    "displayName": "Qwen3.6 Max Preview",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.6-max-preview",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 1.04,
+            "outputPerMTok": 6.24,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "OpenRouter preview route confirmed; exact non-preview native route not confirmed",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-6-plus",
+    "displayName": "Qwen3.6 Plus",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3.6-plus",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.6-plus",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.325,
+            "outputPerMTok": 1.95,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "international-available",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://www.alibabacloud.com/help/en/model-studio/vision-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-7-max",
+    "displayName": "Qwen3.7 Max",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.7-max",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 1.25,
+            "outputPerMTok": 3.75,
+            "cachedInputPerMTok": 0.25
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; native compatible-mode route unverified",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-7-plus",
+    "displayName": "Qwen3.7 Plus",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.7-plus",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.4,
+            "outputPerMTok": 1.6,
+            "cachedInputPerMTok": 0.08
+          },
+          "modalities": [
+            "text",
+            "image"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; native route not found",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-235b-a22b-2507",
+    "displayName": "Qwen3 235B A22B 2507",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3-235b-a22b-thinking-2507",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "mode": "thinking-only"
+        }
+      },
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3-235b-a22b-instruct-2507",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "mode": "non-thinking-only"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3-235b-a22b-2507",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 16384,
+          "pricing": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.1,
+            "cachedInputPerMTok": null
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 16384
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "none"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 16384
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0,
+        "outputPerMTok": 0,
+        "cachedInputPerMTok": 0
+      },
+      "knowledgeCutoff": "",
+      "deprecated": false,
+      "availability": "international-available; legacy/no longer recommended for new projects",
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-06-10",
+      "confidence": "verified"
+    }
+  }
+]
