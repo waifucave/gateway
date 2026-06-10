@@ -21,6 +21,7 @@ export type ValidationResult = {
   ok: boolean;
   violations: ValidationViolation[];
   warnings: ConstraintWarning[];
+  /** Only meaningful when `ok` is true — may contain the rejected values otherwise. */
   effectiveParams: Record<string, unknown>;
 };
 
@@ -104,21 +105,29 @@ export function validateRequest(model: ResolvedModel, input: ValidateInput): Val
     effective[name] = value;
     userProvided.add(name);
   }
-  if (toolChoiceMode) {
-    effective["toolChoice"] = toolChoiceMode;
-    userProvided.add("toolChoice");
-  }
-  if (input.responseFormat) {
-    effective["responseFormat"] = input.responseFormat;
-    userProvided.add("responseFormat");
-  }
+
+  // 3b. pseudo-params for constraint matching: track injection so a real model
+  // param with the same canonical name (e.g. OpenAI's responseFormat map) is
+  // restored after rule evaluation instead of being silently stripped.
+  const injectedPseudo: Array<{ key: string; had: boolean; prior: unknown }> = [];
+  const injectPseudo = (key: string, value: unknown) => {
+    injectedPseudo.push({ key, had: key in effective, prior: effective[key] });
+    effective[key] = value;
+    userProvided.add(key);
+  };
+  if (toolChoiceMode) injectPseudo("toolChoice", toolChoiceMode);
+  if (input.responseFormat) injectPseudo("responseFormat", input.responseFormat);
 
   // 4. constraint rules
   const constraintResult = applyConstraints(model.constraints, effective, userProvided);
   violations.push(...constraintResult.violations);
 
-  // 5. strip the pseudo-params back out of effective
-  const { toolChoice: _tc, responseFormat: _rf, ...effectiveParams } = constraintResult.effective;
+  // 5. remove injected pseudo-params, restoring any real param they shadowed
+  const effectiveParams = { ...constraintResult.effective };
+  for (const { key, had, prior } of injectedPseudo) {
+    if (had) effectiveParams[key] = prior;
+    else delete effectiveParams[key];
+  }
 
   return { ok: violations.length === 0, violations, warnings: constraintResult.warnings, effectiveParams };
 }
