@@ -110,6 +110,7 @@ export type CapabilityDoc = {
     pricing?: Pricing;
     knowledgeCutoff?: string;
     deprecated?: boolean;
+    availability?: string;
     sources: string[];
     verifiedAt?: string;
     confidence: Confidence;
