@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Registry } from "../../src/registry/loader.js";
 
@@ -47,5 +48,34 @@ describe("Registry", () => {
   it("returns undefined for unknown routes and collects no error-level diagnostics", () => {
     expect(registry.resolve("deepseek", "no-such-model")).toBeUndefined();
     expect(Array.isArray(registry.diagnostics())).toBe(true);
+  });
+
+  it("uses endpoint overrides and reports duplicate routes via fixture data", () => {
+    const fixture = Registry.load(join(import.meta.dirname, "../fixtures/loader"));
+    const model = fixture.resolve("deepseek", "synthetic-a");
+    expect(model).toBeDefined();
+    expect(fixture.diagnostics().some((d) => d.message === "duplicate route deepseek:synthetic-a")).toBe(true);
+  });
+
+  it("drops provider-scoped dotted params on routes with supportedParameters", () => {
+    const model = registry.resolve("openrouter", "google/gemini-3.1-pro-preview");
+    expect(model).toBeDefined();
+    expect(Object.keys(model!.params).some((p) => p.startsWith("google."))).toBe(false);
+  });
+
+  it("keeps provider-scoped dotted params on native routes (no supportedParameters)", () => {
+    const fixture = Registry.load(join(import.meta.dirname, "../fixtures/loader"));
+    const model = fixture.resolve("deepseek", "synthetic-a");
+    expect(Object.keys(model!.params)).toContain("google.safetySettings");
+  });
+
+  it("modalities override replaces input but keeps base output", () => {
+    // openrouter route for google/gemini-3.1-pro-preview has override
+    // modalities ["text","image","file","audio","video"] vs base input
+    // ["text","image","video","audio","pdf"]; output stays ["text"] from base.
+    const model = registry.resolve("openrouter", "google/gemini-3.1-pro-preview");
+    expect(model).toBeDefined();
+    expect(model!.modalities.input).toEqual(["text", "image", "file", "audio", "video"]);
+    expect(model!.modalities.output).toEqual(["text"]);
   });
 });
