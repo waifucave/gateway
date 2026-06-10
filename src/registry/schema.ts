@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ConstraintCondition } from "./types.js";
 
 const ParamDescriptorSchema = z
   .object({
@@ -14,7 +15,7 @@ const ParamDescriptorSchema = z
   })
   .strict();
 
-const ConstraintConditionSchema: z.ZodType<unknown> = z.lazy(() =>
+const ConstraintConditionSchema: z.ZodType<ConstraintCondition> = z.lazy(() =>
   z
     .object({
       param: z.string().optional(),

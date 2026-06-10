@@ -55,7 +55,7 @@ export type RouteOverrides = {
   baseUrl?: string;
   endpoint?: string;
   contextTokens?: number;
-  maxOutputTokens?: number;
+  maxOutputTokens?: number | null;
   pricing?: Pricing;
   modalities?: string[];
   supportedParameters?: string[];
