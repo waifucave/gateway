@@ -7,9 +7,15 @@
     "routes": [
       {
         "providerId": "deepseek",
-        "modelId": "synthetic-a",
+        "modelId": "synthetic-endpoint",
         "wire": "openai-chat",
         "overrides": { "endpoint": "/custom/endpoint" }
+      },
+      {
+        "providerId": "deepseek",
+        "modelId": "synthetic-a",
+        "wire": "openai-chat",
+        "overrides": {}
       },
       {
         "providerId": "deepseek",
