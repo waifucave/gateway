@@ -52,8 +52,8 @@ describe("Registry", () => {
 
   it("uses endpoint overrides and reports duplicate routes via fixture data", () => {
     const fixture = Registry.load(join(import.meta.dirname, "../fixtures/loader"));
-    const model = fixture.resolve("deepseek", "synthetic-a");
-    expect(model).toBeDefined();
+    expect(fixture.resolve("deepseek", "synthetic-endpoint")!.endpoint).toBe("/custom/endpoint");
+    expect(fixture.resolve("deepseek", "synthetic-a")!.endpoint).toBe("/chat/completions");
     expect(fixture.diagnostics().some((d) => d.message === "duplicate route deepseek:synthetic-a")).toBe(true);
   });
 
