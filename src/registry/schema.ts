@@ -122,6 +122,7 @@ export const CapabilityDocSchema = z
         pricing: PricingSchema.optional(),
         knowledgeCutoff: z.string().optional(),
         deprecated: z.boolean().optional(),
+        availability: z.string().optional(),
         sources: z.array(z.string()).min(1),
         verifiedAt: z.string().optional(),
         confidence: z.enum(["verified", "partial", "unverified", "conflicting"])

@@ -64,7 +64,6 @@
         "toolChoice": [
           "auto",
           "none",
-          "any",
           "required",
           "named"
         ],
@@ -211,7 +210,6 @@
         "toolChoice": [
           "auto",
           "none",
-          "any",
           "required",
           "named"
         ],
