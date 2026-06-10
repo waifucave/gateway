@@ -68,7 +68,16 @@ export class Registry {
     const diags: RegistryDiagnostic[] = [];
     for (const doc of docs) {
       for (const route of doc.routes) {
-        routeIndex.set(`${route.providerId} ${route.modelId}`, { doc, route });
+        const key = `${route.providerId} ${route.modelId}`;
+        if (routeIndex.has(key)) {
+          diags.push({
+            level: "warning",
+            family: doc.family,
+            providerId: route.providerId,
+            message: `duplicate route ${route.providerId}:${route.modelId}`
+          });
+        }
+        routeIndex.set(key, { doc, route });
         for (const wireName of route.overrides?.supportedParameters ?? []) {
           if (!(wireName in WIRE_PARAM_TO_CANONICAL) && !NON_PARAM_WIRE_NAMES.has(wireName)) {
             diags.push({
@@ -123,12 +132,15 @@ export class Registry {
       );
       const reasoningAllowed =
         o.supportedParameters.includes("reasoning") || o.supportedParameters.includes("include_reasoning");
+      // supportedParameters describes the full param surface of this route
+      // (OpenRouter routes carry it). Provider-scoped dotted params like
+      // "google.safetySettings" are native-route knobs: they survive only on
+      // routes WITHOUT supportedParameters, i.e. this filter drops them here.
       params = Object.fromEntries(
         Object.entries(params).filter(
           ([name]) =>
             canonical.has(name) ||
-            (reasoningAllowed && name.startsWith("reasoning.")) ||
-            (name.includes(".") && !name.startsWith("reasoning."))
+            (reasoningAllowed && name.startsWith("reasoning."))
         )
       );
     }

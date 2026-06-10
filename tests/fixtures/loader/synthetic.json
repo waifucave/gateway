@@ -1,0 +1,38 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "synthetic-model",
+    "displayName": "Synthetic Model",
+    "company": "Synthetic",
+    "routes": [
+      {
+        "providerId": "deepseek",
+        "modelId": "synthetic-a",
+        "wire": "openai-chat",
+        "overrides": { "endpoint": "/custom/endpoint" }
+      },
+      {
+        "providerId": "deepseek",
+        "modelId": "synthetic-a",
+        "wire": "openai-chat",
+        "overrides": {}
+      }
+    ],
+    "limits": { "contextTokens": 1000, "maxOutputTokens": 100 },
+    "modalities": { "input": ["text", "image"], "output": ["text"] },
+    "features": {
+      "streaming": true,
+      "tools": { "supported": false },
+      "structuredOutput": {},
+      "promptCaching": { "kind": "none" },
+      "systemRole": "system"
+    },
+    "params": {
+      "temperature": { "type": "number", "min": 0, "max": 2 },
+      "google.safetySettings": { "type": "map" },
+      "reasoning.enabled": { "type": "boolean" }
+    },
+    "constraints": [],
+    "meta": { "sources": ["synthetic"], "confidence": "verified" }
+  }
+]
