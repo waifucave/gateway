@@ -62,4 +62,21 @@ describe("validateRequest", () => {
     expect(result.effectiveParams["temperature"]).toBe(0.5);
     expect(result.effectiveParams["reasoning.enabled"]).toBe(false);
   });
+
+  it("preserves a real responseFormat model param in effectiveParams (gpt-5.5 carries one)", () => {
+    const model = registry.resolve("openai", "gpt-5.5")!;
+    const value = { type: "json_schema", schema: { type: "object" } };
+    const result = validateRequest(model, { params: { responseFormat: value } });
+    expect(result.ok).toBe(true);
+    expect(result.effectiveParams["responseFormat"]).toEqual(value);
+  });
+
+  it("restores a shadowed real param after pseudo responseFormat rule matching", () => {
+    // gpt-5.5 has features.structuredOutput.jsonSchema=true, so result.ok is true
+    const model = registry.resolve("openai", "gpt-5.5")!;
+    const value = { type: "json_schema", schema: { type: "object" } };
+    const result = validateRequest(model, { params: { responseFormat: value }, responseFormat: "json_schema" });
+    expect(result.ok).toBe(true);
+    expect(result.effectiveParams["responseFormat"]).toEqual(value);
+  });
 });
