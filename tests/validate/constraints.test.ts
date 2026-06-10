@@ -66,4 +66,14 @@ describe("applyConstraints", () => {
     expect(applyConstraints([rule], { a: 6, b: "y", d: 1 }, new Set(["d"])).effective).not.toHaveProperty("d");
     expect(applyConstraints([rule], { a: 4, b: "y", d: 1 }, new Set(["d"])).effective).toHaveProperty("d");
   });
+
+  it("evaluates rules in order against evolving params (force triggers a later rule)", () => {
+    const rules: ConstraintRule[] = [
+      { id: "first", when: { param: "a", eq: true }, then: { force: { mode: "strict" } } },
+      { id: "second", when: { param: "mode", eq: "strict" }, then: { drop: ["b"] } }
+    ];
+    const result = applyConstraints(rules, { a: true, b: 1 }, new Set(["b"]));
+    expect(result.effective).not.toHaveProperty("b");
+    expect(result.warnings.map((w) => w.code)).toEqual(["forced", "dropped"]);
+  });
 });

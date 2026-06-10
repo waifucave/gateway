@@ -54,6 +54,8 @@ export function applyConstraints(
       const sep = entry.indexOf(":");
       if (sep >= 0) {
         const param = entry.slice(0, sep);
+        // value is always a string slice; value-qualified forbids are only
+        // meaningful for string-valued params (e.g. "toolChoice:required")
         const value = entry.slice(sep + 1);
         if (effective[param] === value) {
           violations.push({ ruleId: rule.id, param, code: "forbidden_value", value });
