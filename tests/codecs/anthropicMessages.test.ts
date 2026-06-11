@@ -185,6 +185,20 @@ describe("anthropic-messages encode — messages & tools", () => {
       )
     ).toThrow(GatewayError);
   });
+
+  it("drops empty text blocks and empty turns (Anthropic rejects empty content)", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "" },
+      { role: "assistant", content: [{ type: "text", text: "" }, { type: "text", text: "ok" }] },
+      { role: "user", content: [] }
+    ];
+    const encoded = goldenEncode({ messages });
+    expect(encoded.body.messages).toEqual([
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+      { role: "assistant", content: [{ type: "text", text: "ok" }] }
+    ]);
+  });
 });
 
 describe("anthropic-messages decodeResponse", () => {
@@ -300,6 +314,23 @@ describe("anthropic-messages decodeStream", () => {
         warnings: []
       }
     });
+  });
+
+  it("trusts a stop_reason captured before truncation (message_stop is just the envelope)", async () => {
+    const events = await collect(
+      anthropicMessagesCodec.decodeStream(
+        model,
+        sse([
+          { event: "message_start", data: '{"type":"message_start","message":{"id":"msg_s","usage":{"input_tokens":2}}}' },
+          { event: "content_block_start", data: '{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' },
+          { event: "content_block_delta", data: '{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"done!"}}' },
+          { event: "message_delta", data: '{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":4}}' }
+        ])
+      )
+    );
+    const done = events.at(-1)!;
+    expect(done.type).toBe("done");
+    if (done.type === "done") expect(done.response.finishReason).toBe("stop");
   });
 
   it("ignores ping and throws on error events", async () => {

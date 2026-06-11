@@ -41,7 +41,11 @@ type WireMessage = { role: "user" | "assistant"; content: Array<Record<string, u
 function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): { system?: string; messages: WireMessage[] } {
   const systems: string[] = [];
   const out: WireMessage[] = [];
-  const push = (role: "user" | "assistant", blocks: Array<Record<string, unknown>>) => {
+  // Anthropic rejects empty content arrays and empty text blocks (400) —
+  // strip empty text blocks and drop turns that end up with no blocks at all.
+  const push = (role: "user" | "assistant", rawBlocks: Array<Record<string, unknown>>) => {
+    const blocks = rawBlocks.filter((block) => !(block.type === "text" && block.text === ""));
+    if (blocks.length === 0) return;
     const last = out[out.length - 1];
     if (last && last.role === role) last.content.push(...blocks);
     else out.push({ role, content: blocks });
@@ -250,7 +254,9 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     // ping and other event types are ignored
   }
 
-  // Truncated stream (no message_stop): the Codec contract still requires a done event.
+  // Truncated stream (no message_stop): the Codec contract still requires a done
+  // event. Anthropic delivers stop_reason in message_delta (message_stop is just
+  // the terminating envelope), so a captured stop_reason is trusted; otherwise "error".
   yield {
     type: "done",
     response: {
@@ -258,7 +264,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       provider: model.providerId,
       model: model.modelId,
       content: assembleContent(blocks),
-      finishReason: "error",
+      finishReason,
       usage: pruneUndefined({ inputTokens, outputTokens, cachedInputTokens }),
       warnings: []
     }
