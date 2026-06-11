@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConstraintCondition } from "./types.js";
+import { ConstraintCondition } from "../../src/registry/types.js";
 
 const ParamDescriptorSchema = z
   .object({
