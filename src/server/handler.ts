@@ -179,6 +179,8 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     if (!Array.isArray(body.messages)) return badRequest("messages must be an array");
     if (body.params !== undefined && !isPlainObject(body.params)) return badRequest("params must be an object");
     if (body.passthrough !== undefined && !isPlainObject(body.passthrough)) return badRequest("passthrough must be an object");
+    if (body.tools !== undefined && !Array.isArray(body.tools)) return badRequest("tools must be an array");
+    if (body.responseFormat !== undefined && !isPlainObject(body.responseFormat)) return badRequest("responseFormat must be an object");
     const chatRequest: ChatRequest = {
       provider: target.provider,
       model: target.model,

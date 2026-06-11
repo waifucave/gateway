@@ -353,4 +353,32 @@ describe("POST /v1/chat (non-streaming)", () => {
     });
     expect(((await response.json()) as { raw: unknown }).raw).toEqual(OK_PAYLOAD);
   });
+
+  it("400s a bare-string responseFormat instead of bypassing validation", async () => {
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false },
+      responseFormat: "json_schema"
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe("responseFormat must be an object");
+  });
+
+  it("400s non-array tools instead of a misleading 500", async () => {
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false },
+      tools: "garbage"
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe("tools must be an array");
+  });
 });
