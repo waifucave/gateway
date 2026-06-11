@@ -1269,7 +1269,7 @@
       "maxOutputTokens": {
         "type": "int",
         "wireName": "generationConfig.maxOutputTokens",
-        "confidence": "verified",
+        "confidence": "unverified",
         "max": 0
       },
       "stopSequences": {
@@ -1440,7 +1440,7 @@
       "maxOutputTokens": {
         "type": "int",
         "wireName": "generationConfig.maxOutputTokens",
-        "confidence": "verified",
+        "confidence": "unverified",
         "max": 0
       },
       "stopSequences": {
