@@ -21,3 +21,29 @@ validateRequest(model, { params: {}, toolChoice: "required" });
 - `src/validate/` — pure constraint engine + request validator.
 
 The published npm package ships the compiled build (`dist/`) plus `data/` — not the TypeScript source. Build from source with `npm install && npm run build`; test with `npm test`.
+
+## Client usage
+
+```ts
+import { createGateway } from "@waifucave/gateway";
+
+const gateway = createGateway({
+  credentials: { deepseek: process.env.DEEPSEEK_API_KEY! }
+});
+
+const response = await gateway.chat({
+  provider: "deepseek",
+  model: "deepseek-v4-pro",
+  messages: [{ role: "user", content: "hi" }],
+  params: { "reasoning.enabled": true }
+});
+console.log(response.content, response.usage, response.warnings);
+
+for await (const event of gateway.stream({ provider: "deepseek", model: "deepseek-v4-pro", messages: [{ role: "user", content: "hi" }] })) {
+  if (event.type === "text-delta") process.stdout.write(event.text);
+}
+```
+
+Validation runs before any network call: unsupported parameters throw
+`GatewayError("unsupported_parameter")` naming the violated rule; constraint
+`drop`/`force`/`clamp` adjustments surface as `response.warnings`.
