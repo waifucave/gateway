@@ -83,8 +83,12 @@ async function fetchRemoteList(provider: ProviderDef, credential: string | undef
     }
     if (provider.wire === "google-generative-language") {
       const models = new Map<string, RemoteModel>();
+      const seenTokens = new Set<string>();
+      const MAX_PAGES = 50; // 50 × pageSize=1000 is far beyond any real provider's model count
       let pageToken: string | undefined;
+      let pages = 0;
       do {
+        if (pages++ >= MAX_PAGES) throw new Error(`pagination exceeded ${MAX_PAGES} pages`);
         const url = `${provider.baseUrl}/v1beta/models?pageSize=1000${pageToken === undefined ? "" : `&pageToken=${encodeURIComponent(pageToken)}`}`;
         const payload = (await fetchJson(url, { "x-goog-api-key": credential ?? "" }, fetchImpl, timeoutMs)) as {
           models?: unknown;
@@ -97,7 +101,12 @@ async function fetchRemoteList(provider: ProviderDef, credential: string | undef
             models.set(id, { id });
           }
         }
-        pageToken = typeof payload.nextPageToken === "string" && payload.nextPageToken !== "" ? payload.nextPageToken : undefined;
+        const next = typeof payload.nextPageToken === "string" && payload.nextPageToken !== "" ? payload.nextPageToken : undefined;
+        if (next !== undefined) {
+          if (seenTokens.has(next)) throw new Error(`pagination repeated token "${next}"`);
+          seenTokens.add(next);
+        }
+        pageToken = next;
       } while (pageToken !== undefined);
       return { models };
     }
@@ -131,6 +140,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncReport> {
   const providersChecked: string[] = [];
   const providersSkipped: Array<{ providerId: string; reason: string }> = [];
 
+  // diagnostics are global data hygiene — intentionally NOT scoped by options.providers
   for (const diagnostic of registry.diagnostics()) {
     findings.push({
       level: "info",

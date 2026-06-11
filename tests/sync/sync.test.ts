@@ -143,6 +143,28 @@ describe("runSync", () => {
     expect(report.findings).toEqual([]);
   });
 
+  it("breaks out of a pagination loop that repeats the same token (warning, not a hang)", async () => {
+    const fetchImpl = fakeFetch({
+      "openrouter.ai": () => OPENROUTER_CLEAN,
+      "api.deepseek.com/models": () => DEEPSEEK_CLEAN,
+      "api.anthropic.com/v1/models": () => ANTHROPIC_CLEAN,
+      "generativelanguage.googleapis.com/v1beta/models": () => ({
+        models: [{ name: "models/gemini-drift-1" }],
+        nextPageToken: "same-token-forever"
+      })
+    });
+    const report = await runSync({ dataDir, credentials: ALL_CREDS, fetchImpl });
+    expect(report.ok).toBe(false);
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({
+        level: "warning",
+        providerId: "google-ai-studio",
+        field: "model-list"
+      })
+    );
+    expect(report.providersChecked).not.toContain("google-ai-studio");
+  });
+
   it("honors the providers filter without marking the rest skipped", async () => {
     const fetchImpl = cleanFetch();
     const report = await runSync({ dataDir, credentials: ALL_CREDS, fetchImpl, providers: ["openrouter"] });
