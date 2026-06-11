@@ -1,0 +1,48 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "drift-model",
+    "displayName": "Drift Model",
+    "company": "Drift Labs",
+    "routes": [
+      { "providerId": "deepseek", "modelId": "drift-native", "wire": "openai-chat", "overrides": { "endpoint": "/chat/completions" } },
+      { "providerId": "openrouter", "modelId": "drift/drift-model", "wire": "openai-chat", "overrides": {} }
+    ],
+    "limits": { "contextTokens": 100000, "maxOutputTokens": 8192 },
+    "modalities": { "input": ["text"], "output": ["text"] },
+    "features": { "streaming": true, "tools": { "supported": false }, "structuredOutput": {}, "promptCaching": { "kind": "none" }, "systemRole": "system" },
+    "params": { "temperature": { "type": "number", "min": 0, "max": 2 } },
+    "constraints": [],
+    "meta": { "pricing": { "inputPerMTok": 0.5, "outputPerMTok": 1.5 }, "sources": ["synthetic"], "confidence": "verified" }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "drift-claude",
+    "displayName": "Drift Claude",
+    "company": "Drift Labs",
+    "routes": [
+      { "providerId": "anthropic", "modelId": "claude-drift-1", "wire": "anthropic-messages", "overrides": { "endpoint": "/v1/messages" } }
+    ],
+    "limits": { "contextTokens": 200000, "maxOutputTokens": 8192 },
+    "modalities": { "input": ["text"], "output": ["text"] },
+    "features": { "streaming": true, "tools": { "supported": false }, "structuredOutput": {}, "promptCaching": { "kind": "none" }, "systemRole": "top-level" },
+    "params": { "maxOutputTokens": { "type": "int", "min": 1, "max": 8192, "wireName": "max_tokens" } },
+    "constraints": [],
+    "meta": { "sources": ["synthetic"], "confidence": "verified" }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "drift-gemini",
+    "displayName": "Drift Gemini",
+    "company": "Drift Labs",
+    "routes": [
+      { "providerId": "google-ai-studio", "modelId": "gemini-drift-1", "wire": "google-generative-language", "overrides": {} }
+    ],
+    "limits": { "contextTokens": 100000, "maxOutputTokens": 8192 },
+    "modalities": { "input": ["text"], "output": ["text"] },
+    "features": { "streaming": true, "tools": { "supported": false }, "structuredOutput": {}, "promptCaching": { "kind": "none" }, "systemRole": "systemInstruction" },
+    "params": { "temperature": { "type": "number", "min": 0, "max": 2, "wireName": "generationConfig.temperature" } },
+    "constraints": [],
+    "meta": { "sources": ["synthetic"], "confidence": "verified" }
+  }
+]
