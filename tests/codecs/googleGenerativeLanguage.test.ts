@@ -225,6 +225,15 @@ describe("google decodeResponse", () => {
   it("throws GatewayError server when candidates are missing", () => {
     expect(() => googleGenerativeLanguageCodec.decodeResponse(model, { promptFeedback: {} })).toThrow(GatewayError);
   });
+
+  it("PINNED LIMITATION: a thoughtSignature on a functionCall part is dropped (ToolCallBlock has no signature field)", () => {
+    const response = googleGenerativeLanguageCodec.decodeResponse(model, {
+      candidates: [
+        { content: { parts: [{ functionCall: { name: "lookup", args: {} }, thoughtSignature: "SIG_ON_FC" }] }, finishReason: "STOP" }
+      ]
+    });
+    expect(response.content).toEqual([{ type: "toolCall", id: "call_0", name: "lookup", arguments: "{}" }]);
+  });
 });
 
 describe("google decodeStream", () => {
