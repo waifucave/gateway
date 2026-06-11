@@ -141,6 +141,12 @@ describe("routing", () => {
     expect(chat.headers.get("allow")).toBe("POST");
   });
 
+  it("404s malformed percent-encoding instead of throwing", async () => {
+    const handler = createGatewayHandler();
+    const response = await get(handler, "/v1/models/deepseek/%E0%A4%A");
+    expect(response.status).toBe(404);
+  });
+
   it("tolerates trailing slashes and URL-encoded segments", async () => {
     const handler = createGatewayHandler();
     expect((await get(handler, "/v1/providers/")).status).toBe(200);

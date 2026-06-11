@@ -44,7 +44,13 @@ function pathSegments(url: string): string[] {
   return new URL(url).pathname
     .split("/")
     .filter((segment) => segment !== "")
-    .map((segment) => decodeURIComponent(segment));
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment; // undecodable segment can't match a route → 404
+      }
+    });
 }
 
 function buildCredentialCheck(credentials: GatewayOptions["credentials"]): (providerId: string) => boolean {
