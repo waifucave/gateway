@@ -34,7 +34,12 @@ export async function gatewayPlugin(instance: FastifyInstance, options: GatewayP
   });
   instance.all("/*", async (request, reply) => {
     const controller = new AbortController();
-    request.raw.on("close", () => {
+    // Disconnect detection must watch the RESPONSE: on Node >=16, IncomingMessage
+    // 'close' fires when the request message is consumed (every parsed body), not
+    // when the client goes away. ServerResponse 'close' fires on completion or
+    // premature termination; writableEnded distinguishes them. Same pattern as
+    // server/node.ts.
+    reply.raw.on("close", () => {
       if (!reply.raw.writableEnded) controller.abort(new Error("client closed the connection"));
     });
     const path = request.url.slice(instance.prefix.length) || "/";
