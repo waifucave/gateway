@@ -98,4 +98,49 @@ describe("fetchWithRetry", () => {
     expect(error.message).toBe("pre-aborted");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+  it("cancels discarded response bodies before retrying", async () => {
+    let cancelled = 0;
+    const retryableResponse = () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("{}"));
+          },
+          cancel() {
+            cancelled++;
+          }
+        }),
+        { status: 503 }
+      );
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(async () => retryableResponse())
+      .mockImplementationOnce(async () => retryableResponse())
+      .mockResolvedValueOnce(json({ ok: true }));
+    const response = await fetchWithRetry("nvidia", REQ, { ...FAST, fetchImpl });
+    expect(response.status).toBe(200);
+    expect(cancelled).toBe(2);
+  });
+
+  it("honors abort during the backoff sleep", async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn().mockResolvedValue(json({ error: { message: "slow" } }, 429));
+    setTimeout(() => controller.abort(new Error("user aborted in backoff")), 20);
+    const started = Date.now();
+    const error = await fetchWithRetry("stepfun", REQ, { fetchImpl, maxRetries: 2, retryBaseDelayMs: 5_000, signal: controller.signal }).catch((e) => e);
+    expect(error.message).toBe("user aborted in backoff");
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("treats empty and negative Retry-After as backoff/zero, not negative delays", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(json({ error: { message: "x" } }, 429, { "retry-after": "" }))
+      .mockResolvedValueOnce(json({ error: { message: "x" } }, 429, { "retry-after": "-5" }))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const response = await fetchWithRetry("mistral", REQ, { ...FAST, fetchImpl });
+    expect(response.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
 });

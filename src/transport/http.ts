@@ -13,13 +13,25 @@ export type HttpOptions = {
   signal?: AbortSignal;
 };
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(); // loop's pre-abort check will throw the caller's reason
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
 function retryDelayMs(attempt: number, base: number, response?: Response): number {
   const retryAfter = response?.headers.get("retry-after");
   if (retryAfter !== null && retryAfter !== undefined) {
-    const seconds = Number(retryAfter);
-    if (Number.isFinite(seconds)) return Math.min(seconds * 1000, 30_000);
+    const trimmed = retryAfter.trim();
+    const seconds = Number(trimmed);
+    if (trimmed !== "" && Number.isFinite(seconds)) return Math.min(Math.max(seconds * 1000, 0), 30_000);
     const date = Date.parse(retryAfter);
     if (!Number.isNaN(date)) return Math.min(Math.max(date - Date.now(), 0), 30_000);
   }
@@ -74,7 +86,7 @@ export async function fetchWithRetry(provider: string, request: HttpRequest, opt
       if (options.signal?.aborted) throw cause; // user abort wins — propagate untouched
       if (timedOut) throw new GatewayError("timeout", `${provider} did not respond within ${timeoutMs}ms`, { provider, cause });
       if (attempt < maxRetries) {
-        await sleep(retryDelayMs(attempt, base));
+        await sleep(retryDelayMs(attempt, base), options.signal);
         continue;
       }
       throw new GatewayError("network", `network error calling ${provider}: ${String(cause)}`, { provider, cause });
@@ -86,7 +98,8 @@ export async function fetchWithRetry(provider: string, request: HttpRequest, opt
     options.signal?.removeEventListener("abort", onAbort);
     const retryable = response.status === 429 || response.status >= 500;
     if (retryable && attempt < maxRetries) {
-      await sleep(retryDelayMs(attempt, base, response));
+      await response.body?.cancel().catch(() => {});
+      await sleep(retryDelayMs(attempt, base, response), options.signal);
       continue;
     }
     throw GatewayError.fromHttp(provider, response.status, await parseBody(response));
