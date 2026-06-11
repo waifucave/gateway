@@ -256,6 +256,7 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
         controller.enqueue(encoder.encode(sseFrame(next.value)));
       },
       cancel() {
+        // cancel after normal completion is a harmless no-op (fetch settled, detach/return idempotent)
         upstream.abort(new Error("client closed the SSE connection"));
         detach();
         void iterator.return(undefined);
