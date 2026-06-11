@@ -3,6 +3,7 @@ import { Registry } from "../../src/registry/loader.js";
 import { validateRequest } from "../../src/validate/validateRequest.js";
 import { GatewayError } from "../../src/errors.js";
 import {
+  applyPassthrough,
   authHeaders,
   buildUrl,
   mapNativeParams,
@@ -11,6 +12,7 @@ import {
   pruneUndefined,
   setPath
 } from "../../src/codecs/shared.js";
+import type { Warning } from "../../src/client/types.js";
 
 const registry = Registry.load();
 
@@ -35,6 +37,12 @@ describe("setPath", () => {
     setPath(target, "a.b", 1);
     expect(target).toEqual({ a: { b: 1 } });
   });
+
+  it("rejects prototype-polluting paths (wireNames are registry-controlled)", () => {
+    expect(() => setPath({}, "__proto__.polluted", true)).toThrow(/unsafe wire path/);
+    expect(() => setPath({}, "constructor.prototype.x", 1)).toThrow(/unsafe wire path/);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
 });
 
 describe("pruneUndefined", () => {
@@ -43,6 +51,31 @@ describe("pruneUndefined", () => {
     const out = pruneUndefined(input);
     expect(out).toEqual({ a: 1, c: { e: 2 }, f: [{ h: 3 }] });
     expect(Object.keys(input.c)).toContain("d"); // input untouched
+  });
+
+  it("preserves null values (only undefined is dropped)", () => {
+    expect(pruneUndefined({ a: null, b: undefined })).toEqual({ a: null });
+  });
+});
+
+describe("applyPassthrough", () => {
+  it("merges keys last-write-wins and warns per key", () => {
+    const body: Record<string, unknown> = { temperature: 1 };
+    const warnings: Warning[] = [];
+    applyPassthrough(body, { temperature: 0.2, service_tier: "flex" }, warnings);
+    expect(body).toEqual({ temperature: 0.2, service_tier: "flex" });
+    expect(warnings).toEqual([
+      { code: "passthrough", param: "temperature", message: "temperature sent unvalidated via passthrough" },
+      { code: "passthrough", param: "service_tier", message: "service_tier sent unvalidated via passthrough" }
+    ]);
+  });
+
+  it("is a no-op for undefined passthrough", () => {
+    const body: Record<string, unknown> = {};
+    const warnings: Warning[] = [];
+    applyPassthrough(body, undefined, warnings);
+    expect(body).toEqual({});
+    expect(warnings).toEqual([]);
   });
 });
 
