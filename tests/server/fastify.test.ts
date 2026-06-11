@@ -1,5 +1,5 @@
 import fastify, { type FastifyInstance } from "fastify";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import gatewayPluginDefault, { gatewayPlugin } from "../../src/server/fastify.js";
 import { jsonFetch, parseSseFrames, sseFetch } from "../helpers/http.js";
 
@@ -123,5 +123,73 @@ describe("gatewayPlugin", () => {
     const response = await app.inject({ method: "GET", url: "/v1/models" });
     expect(response.statusCode).toBe(200);
     expect((response.json() as { models: unknown[] }).models).toHaveLength(100);
+  });
+});
+
+// inject() never reproduces real socket close timing — these run over a listening server.
+describe("gatewayPlugin over a real socket", () => {
+  const CHAT_BODY = JSON.stringify({
+    provider: "deepseek",
+    model: "deepseek-v4-pro",
+    messages: [{ role: "user", content: "hi" }],
+    params: { "reasoning.enabled": false }
+  });
+
+  it("does not abort the upstream call while a connected client waits on a slow upstream", async () => {
+    // Node >=16: IncomingMessage 'close' fires when the request message is consumed,
+    // not when the client disconnects. Listening there aborted EVERY chat request
+    // whose upstream took longer than body parsing (found live in Discord Waifus P2).
+    const fetchImpl = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+          setTimeout(() => resolve(new Response(JSON.stringify(OK_PAYLOAD), { status: 200 })), 80);
+        })
+    );
+    app = fastify();
+    await app.register(gatewayPlugin, {
+      prefix: "/api/llm",
+      credentials: { deepseek: "sk-test" },
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+    const address = await app.listen({ port: 0, host: "127.0.0.1" });
+
+    const response = await fetch(`${address}/api/llm/v1/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: CHAT_BODY
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ content: [{ type: "text", text: "hello" }], finishReason: "stop" });
+  });
+
+  it("still aborts the upstream call when the client actually disconnects", async () => {
+    let upstreamSignal: AbortSignal | undefined;
+    const fetchImpl = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          upstreamSignal = init?.signal ?? undefined;
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        })
+    );
+    app = fastify();
+    await app.register(gatewayPlugin, {
+      prefix: "/api/llm",
+      credentials: { deepseek: "sk-test" },
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+    const address = await app.listen({ port: 0, host: "127.0.0.1" });
+
+    const clientAbort = new AbortController();
+    const clientRequest = fetch(`${address}/api/llm/v1/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: CHAT_BODY,
+      signal: clientAbort.signal
+    }).catch(() => undefined); // the client abort itself is expected
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalled());
+    clientAbort.abort();
+    await clientRequest;
+    await vi.waitFor(() => expect(upstreamSignal?.aborted).toBe(true));
   });
 });
