@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createGatewayHandler } from "../../src/server/handler.js";
 import { envCredentials } from "../../src/server/env.js";
-import { jsonFetch } from "../helpers/http.js";
+import { jsonFetch, parseSseFrames, sseFetch } from "../helpers/http.js";
 
 const get = (handler: ReturnType<typeof createGatewayHandler>, path: string, init?: RequestInit) =>
   handler.handle(new Request(`http://gateway.test${path}`, init));
@@ -380,5 +380,231 @@ describe("POST /v1/chat (non-streaming)", () => {
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: { message: string } };
     expect(body.error.message).toBe("tools must be an array");
+  });
+});
+
+describe("POST /v1/chat (streaming SSE)", () => {
+  const DEEPSEEK_SSE = [
+    'data: {"id":"c1","choices":[{"delta":{"content":"he"}}]}',
+    "",
+    'data: {"choices":[{"delta":{"content":"y"},"finish_reason":"stop"}]}',
+    "",
+    'data: {"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":1}}',
+    "",
+    "data: [DONE]",
+    ""
+  ];
+
+  it("streams normalized events as SSE frames ending with [DONE]", async () => {
+    const fetchImpl = sseFetch(DEEPSEEK_SSE);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { temperature: 0.7, "reasoning.enabled": true },
+      stream: true
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
+    expect(response.headers.get("cache-control")).toBe("no-cache");
+    expect(JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string)).toMatchObject({
+      stream: true,
+      stream_options: { include_usage: true }
+    });
+
+    const frames = parseSseFrames(await response.text());
+    expect(frames.map((f) => (typeof f === "string" ? f : (f as { type: string }).type))).toEqual([
+      "text-delta",
+      "text-delta",
+      "usage",
+      "done",
+      "[DONE]"
+    ]);
+    const done = frames[3] as { response: { content: unknown; warnings: Array<{ code: string; param: string }> } };
+    expect(done.response.content).toEqual([{ type: "text", text: "hey" }]);
+    expect(done.response.warnings.some((w) => w.code === "param_dropped" && w.param === "temperature")).toBe(true);
+  });
+
+  it("drives the openai-responses wire end to end (carryover #5)", async () => {
+    const completed = {
+      id: "resp_2",
+      status: "completed",
+      output: [{ type: "message", content: [{ type: "output_text", text: "hi!" }] }],
+      usage: { input_tokens: 3, output_tokens: 2 }
+    };
+    const fetchImpl = sseFetch([
+      "event: response.output_text.delta",
+      'data: {"type":"response.output_text.delta","output_index":0,"delta":"hi"}',
+      "",
+      "event: response.output_text.delta",
+      'data: {"type":"response.output_text.delta","output_index":0,"delta":"!"}',
+      "",
+      "event: response.completed",
+      `data: ${JSON.stringify({ type: "response.completed", response: completed })}`,
+      ""
+    ]);
+    const handler = createGatewayHandler({ credentials: { openai: "sk-oai" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "openai",
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "hi" }],
+      stream: true
+    });
+    expect(response.status).toBe(200);
+    const [url, init] = fetchImpl.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.openai.com/v1/responses");
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-oai");
+    expect(JSON.parse(init.body as string)).toMatchObject({ model: "gpt-5.5", stream: true });
+
+    const frames = parseSseFrames(await response.text());
+    expect(frames.map((f) => (typeof f === "string" ? f : (f as { type: string }).type))).toEqual([
+      "text-delta",
+      "text-delta",
+      "usage",
+      "done",
+      "[DONE]"
+    ]);
+    const done = frames[3] as { response: { content: unknown; finishReason: string } };
+    expect(done.response.content).toEqual([{ type: "text", text: "hi!" }]);
+    expect(done.response.finishReason).toBe("stop");
+  });
+
+  it("drives the google wire end to end (carryover #5)", async () => {
+    const fetchImpl = sseFetch([
+      'data: {"responseId":"r2","candidates":[{"content":{"parts":[{"text":"hm","thought":true}]}}]}',
+      "",
+      'data: {"candidates":[{"content":{"parts":[{"text":"he"}]}}]}',
+      "",
+      'data: {"candidates":[{"content":{"parts":[{"text":"llo"},{"functionCall":{"name":"lookup","args":{"q":1}}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
+      ""
+    ]);
+    const handler = createGatewayHandler({ credentials: { "google-ai-studio": "sk-goog" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "google-ai-studio",
+      model: "gemini-2.5-flash",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ name: "lookup", parameters: { type: "object", properties: {} } }],
+      stream: true
+    });
+    expect(response.status).toBe(200);
+    const [url, init] = fetchImpl.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+    expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe("sk-goog");
+
+    const frames = parseSseFrames(await response.text());
+    expect(frames.map((f) => (typeof f === "string" ? f : (f as { type: string }).type))).toEqual([
+      "reasoning-delta",
+      "text-delta",
+      "text-delta",
+      "tool-call-delta",
+      "usage",
+      "done",
+      "[DONE]"
+    ]);
+    const done = frames[5] as { response: { content: Array<{ type: string }>; finishReason: string } };
+    expect(done.response.finishReason).toBe("tool_calls");
+    expect(done.response.content).toEqual([
+      { type: "reasoning", text: "hm" },
+      { type: "text", text: "hello" },
+      { type: "toolCall", id: "call_0", name: "lookup", arguments: '{"q":1}' }
+    ]);
+  });
+
+  it("maps pre-I/O failures to HTTP statuses instead of a 200 SSE", async () => {
+    const fetchImpl = sseFetch(DEEPSEEK_SSE);
+    const withCreds = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const validation = await post(withCreds, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      toolChoice: "required",
+      params: { "reasoning.enabled": true },
+      stream: true
+    });
+    expect(validation.status).toBe(400);
+    expect(validation.headers.get("content-type")).toBe("application/json");
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const noCreds = createGatewayHandler({ fetchImpl });
+    const auth = await post(noCreds, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      stream: true
+    });
+    expect(auth.status).toBe(401);
+  });
+
+  it("delivers mid-stream failures as a serialized error event, then [DONE]", async () => {
+    const fetchImpl = sseFetch(["data: {broken", ""]);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false },
+      stream: true
+    });
+    // the broken frame IS the first event: gateway.stream wraps decode failures as an error event,
+    // so the probe yields {type:"error"} and the handler still answers 200 SSE. Pinned on purpose:
+    // only pre-I/O throws become HTTP statuses.
+    expect(response.status).toBe(200);
+    const frames = parseSseFrames(await response.text());
+    expect(frames).toHaveLength(2);
+    expect(frames[0]).toMatchObject({ type: "error", error: { kind: expect.any(String), retryable: expect.any(Boolean) } });
+    expect(frames[1]).toBe("[DONE]");
+  });
+
+  it("returns 499 for a request whose signal is already aborted (carryover #3)", async () => {
+    const fetchImpl = sseFetch(DEEPSEEK_SSE);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const controller = new AbortController();
+    controller.abort(new Error("client gone"));
+    const response = await handler.handle(
+      new Request("http://gateway.test/v1/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: "deepseek",
+          model: "deepseek-v4-pro",
+          messages: [{ role: "user", content: "hi" }],
+          params: { "reasoning.enabled": false },
+          stream: true
+        }),
+        signal: controller.signal
+      })
+    );
+    expect(response.status).toBe(499);
+  });
+
+  it("aborts the upstream provider fetch when the SSE consumer cancels (client disconnect)", async () => {
+    let upstreamSignal: AbortSignal | undefined;
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      upstreamSignal = init?.signal ?? undefined;
+      const encoder = new TextEncoder();
+      // one frame, then the body stays open forever
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"id":"c1","choices":[{"delta":{"content":"he"}}]}\n\n'));
+        }
+      });
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    }) as unknown as typeof fetch;
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false },
+      stream: true
+    });
+    expect(response.status).toBe(200);
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toContain("text-delta");
+    expect(upstreamSignal?.aborted).toBe(false);
+    await reader.cancel();
+    expect(upstreamSignal?.aborted).toBe(true);
   });
 });

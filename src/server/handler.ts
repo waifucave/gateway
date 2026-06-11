@@ -1,8 +1,7 @@
 import { Gateway, type GatewayOptions } from "../client/gateway.js";
 import { PROVIDERS } from "../registry/providers.js";
-import { GatewayError } from "../errors.js";
-import { errorResponse, jsonResponse } from "./shared.js";
-import type { ChatMessage, ChatRequest, ResponseFormat, ToolChoice, ToolDef } from "../client/types.js";
+import { errorResponse, jsonResponse, serializeGatewayError } from "./shared.js";
+import type { ChatMessage, ChatRequest, ResponseFormat, StreamEvent, ToolChoice, ToolDef } from "../client/types.js";
 import type { ValidateInput } from "../validate/validateRequest.js";
 
 export type GatewayHandlerOptions = GatewayOptions;
@@ -34,6 +33,14 @@ export type GatewayHttpHandler = {
 };
 
 const NOT_FOUND_BODY = { error: { kind: "invalid_request", message: "not found", retryable: false } };
+
+const SSE_HEADERS = { "content-type": "text/event-stream", "cache-control": "no-cache" };
+const DONE_FRAME = "data: [DONE]\n\n";
+
+function sseFrame(event: StreamEvent): string {
+  const payload = event.type === "error" ? { type: "error", error: serializeGatewayError(event.error) } : event;
+  return `data: ${JSON.stringify(payload)}\n\n`;
+}
 
 function methodNotAllowed(allow: string): Response {
   return new Response(
@@ -200,8 +207,61 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     }
   }
 
-  async function streamingChat(_chatRequest: ChatRequest, _requestSignal: AbortSignal): Promise<Response> {
-    throw new GatewayError("server", "not implemented: streaming"); // Task 4
+  /**
+   * SSE notes:
+   * - First-event probe: gateway.stream() rejects its first next() for pre-I/O
+   *   failures (validation, credentials) — probing it BEFORE building the
+   *   Response maps those to real HTTP statuses instead of a 200 SSE.
+   * - The provider fetch runs off a handler-owned controller linked to BOTH the
+   *   request signal and ReadableStream.cancel(), so a vanished client aborts
+   *   the upstream call (the transport keeps the signal wired to the body).
+   * - timeoutMs bounds time-to-headers only (P1b carryover #2); the body is
+   *   deliberately unbounded — streams run until done/error or client cancel.
+   */
+  async function streamingChat(chatRequest: ChatRequest, requestSignal: AbortSignal): Promise<Response> {
+    if (requestSignal.aborted) return errorResponse(requestSignal.reason, requestSignal);
+    const upstream = new AbortController();
+    const onAbort = () => upstream.abort(requestSignal.reason);
+    requestSignal.addEventListener("abort", onAbort, { once: true });
+    const detach = () => requestSignal.removeEventListener("abort", onAbort);
+
+    const iterator = gateway.stream({ ...chatRequest, signal: upstream.signal });
+    let first: IteratorResult<StreamEvent>;
+    try {
+      first = await iterator.next();
+    } catch (error) {
+      detach();
+      return errorResponse(error, requestSignal);
+    }
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        if (first.done) {
+          controller.enqueue(encoder.encode(DONE_FRAME));
+          controller.close();
+          detach();
+          return;
+        }
+        controller.enqueue(encoder.encode(sseFrame(first.value)));
+      },
+      async pull(controller) {
+        const next = await iterator.next();
+        if (next.done) {
+          controller.enqueue(encoder.encode(DONE_FRAME));
+          controller.close();
+          detach();
+          return;
+        }
+        controller.enqueue(encoder.encode(sseFrame(next.value)));
+      },
+      cancel() {
+        upstream.abort(new Error("client closed the SSE connection"));
+        detach();
+        void iterator.return(undefined);
+      }
+    });
+    return new Response(stream, { status: 200, headers: SSE_HEADERS });
   }
 
   async function handle(request: Request): Promise<Response> {
