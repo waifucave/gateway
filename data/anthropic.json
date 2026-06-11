@@ -215,7 +215,7 @@
     ],
     "limits": {
       "contextTokens": 200000,
-      "maxOutputTokens": 0
+      "maxOutputTokens": 64000
     },
     "modalities": {
       "input": [
@@ -259,7 +259,7 @@
         "type": "int",
         "wireName": "max_tokens",
         "confidence": "verified",
-        "max": 0
+        "max": 64000
       },
       "temperature": {
         "type": "number",
