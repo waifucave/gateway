@@ -80,3 +80,42 @@ describe("validateRequest", () => {
     expect(result.effectiveParams["responseFormat"]).toEqual(value);
   });
 });
+
+describe("unverified descriptors and placeholder caps (found live in Discord Waifus P2 smoke)", () => {
+  it("skips range enforcement for unverified descriptors — a P0 placeholder max=0 must not reject requests (§4.2)", () => {
+    const model = registry.resolve("xai", "grok-4.3")!;
+    expect(model.params["maxOutputTokens"]?.confidence).toBe("unverified");
+    const result = validateRequest(model, { params: { maxOutputTokens: 4096 } });
+    expect(result.violations.filter((v) => v.param === "maxOutputTokens")).toEqual([]);
+  });
+
+  it("still type-checks unverified params", () => {
+    const model = registry.resolve("xai", "grok-4.3")!;
+    const result = validateRequest(model, { params: { maxOutputTokens: "lots" } });
+    expect(result.violations.some((v) => v.param === "maxOutputTokens" && v.code === "wrong_type")).toBe(true);
+  });
+
+  it("Sonnet 4.5 carries its documented 64000 output cap (native cell was a verified placeholder 0; the OpenRouter route override already had 64000)", () => {
+    const model = registry.resolve("anthropic", "claude-sonnet-4-5-20250929")!;
+    expect(model.limits.maxOutputTokens).toBe(64000);
+    expect(
+      validateRequest(model, { params: { maxOutputTokens: 64000 } }).violations.filter(
+        (v) => v.param === "maxOutputTokens"
+      )
+    ).toEqual([]);
+    const over = validateRequest(model, { params: { maxOutputTokens: 64001 } });
+    expect(over.violations.some((v) => v.param === "maxOutputTokens" && v.code === "out_of_range")).toBe(true);
+  });
+
+  it("Gemma output caps are unverified per P0 findings, so a cap request passes through", () => {
+    for (const id of ["gemma-4-26b-a4b-it", "gemma-4-31b-it"]) {
+      const model = registry.resolve("google-ai-studio", id)!;
+      expect(model.params["maxOutputTokens"]?.confidence).toBe("unverified");
+      expect(
+        validateRequest(model, { params: { maxOutputTokens: 2048 } }).violations.filter(
+          (v) => v.param === "maxOutputTokens"
+        )
+      ).toEqual([]);
+    }
+  });
+});

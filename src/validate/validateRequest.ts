@@ -29,12 +29,17 @@ function checkDescriptor(name: string, value: unknown, d: ParamDescriptor): Vali
   const wrong = (expected: string): ValidationViolation => ({
     param: name, code: "wrong_type", message: `${name} must be ${expected}`
   });
+  // MIGRATION_PLAN §4.2: unverified descriptors skip enforcement — their
+  // range/enum/maxItems cells are research placeholders (often literal 0) and
+  // must never block a request. Type checks stay: they're structural, and a
+  // mistyped value would produce a broken wire body regardless of confidence.
+  const enforceValues = d.confidence !== "unverified";
   switch (d.type) {
     case "number":
     case "int": {
       if (typeof value !== "number" || Number.isNaN(value)) return wrong("a number");
       if (d.type === "int" && !Number.isInteger(value)) return wrong("an integer");
-      if ((d.min !== undefined && value < d.min) || (d.max !== undefined && value > d.max)) {
+      if (enforceValues && ((d.min !== undefined && value < d.min) || (d.max !== undefined && value > d.max))) {
         return { param: name, code: "out_of_range", message: `${name} must be in [${d.min ?? "-inf"}, ${d.max ?? "inf"}]` };
       }
       return undefined;
@@ -43,7 +48,7 @@ function checkDescriptor(name: string, value: unknown, d: ParamDescriptor): Vali
       return typeof value === "boolean" ? undefined : wrong("a boolean");
     case "enum":
       if (typeof value !== "string") return wrong("a string");
-      if (d.values && !d.values.includes(value)) {
+      if (enforceValues && d.values && !d.values.includes(value)) {
         return { param: name, code: "bad_enum", message: `${name} must be one of ${d.values.join(", ")}` };
       }
       return undefined;
@@ -51,7 +56,7 @@ function checkDescriptor(name: string, value: unknown, d: ParamDescriptor): Vali
       return typeof value === "string" ? undefined : wrong("a string");
     case "string[]": {
       if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) return wrong("an array of strings");
-      if (d.maxItems !== undefined && value.length > d.maxItems) {
+      if (enforceValues && d.maxItems !== undefined && value.length > d.maxItems) {
         return { param: name, code: "max_items", message: `${name} allows at most ${d.maxItems} items` };
       }
       return undefined;
