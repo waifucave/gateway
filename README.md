@@ -1,8 +1,8 @@
 # @waifucave/gateway
 
-Provider-agnostic LLM normalization layer: a curated capability registry for 54 models across 15 companies, per-model parameter validation with declarative quirk constraints, and (upcoming) a unified chat API over OpenRouter + 13 direct providers.
+Provider-agnostic LLM normalization layer: a curated capability registry for 54 model families (100 routes) across 15 companies, per-model parameter validation with declarative quirk constraints, and a unified chat API over OpenRouter + 13 direct providers.
 
-**Status: pre-release.** The registry and validation engine are complete; codecs/transport/client and the HTTP server are in development.
+**Status: pre-release.** Registry, validation engine, the four wire codecs, transport, and the client are complete; the HTTP server and drift sync are in development.
 
 ```ts
 import { Registry, validateRequest } from "@waifucave/gateway";
