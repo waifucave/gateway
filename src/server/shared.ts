@@ -50,5 +50,11 @@ export function errorResponse(error: unknown, signal?: AbortSignal): Response {
   if (signal?.aborted) {
     return jsonResponse(499, { error: { kind: "network", message: "client aborted the request", retryable: false } });
   }
-  return jsonResponse(500, { error: { kind: "server", message: `unexpected error: ${String(error)}`, retryable: false } });
+  let detail: string;
+  try {
+    detail = String(error);
+  } catch {
+    detail = "(unserializable error)"; // never throw inside error handling
+  }
+  return jsonResponse(500, { error: { kind: "server", message: `unexpected error: ${detail}`, retryable: false } });
 }
