@@ -607,4 +607,41 @@ describe("POST /v1/chat (streaming SSE)", () => {
     await reader.cancel();
     expect(upstreamSignal?.aborted).toBe(true);
   });
+
+  it("survives an error event arriving into an orphaned pull after cancel (no unhandled rejection)", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    try {
+      let failBody: (() => void) | undefined;
+      const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode('data: {"id":"c1","choices":[{"delta":{"content":"he"}}]}\n\n'));
+            // when the upstream aborts, error the body read like a real socket teardown
+            init?.signal?.addEventListener("abort", () => failBody?.(), { once: true });
+            failBody = () => controller.error(new Error("socket torn down"));
+          }
+        });
+        return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+      }) as unknown as typeof fetch;
+
+      const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+      const response = await post(handler, "/v1/chat", {
+        provider: "deepseek",
+        model: "deepseek-v4-pro",
+        messages: [{ role: "user", content: "hi" }],
+        params: { "reasoning.enabled": false },
+        stream: true
+      });
+      const reader = response.body!.getReader();
+      await reader.read(); // first frame; a pull for the second is now parked on iterator.next()
+      await reader.cancel(); // aborts upstream → body errors → generator yields error event into the orphaned pull
+      await new Promise((resolve) => setTimeout(resolve, 20)); // let the orphaned pull settle
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+  });
 });
