@@ -102,6 +102,46 @@ describe("gateway.chat", () => {
       gateway.chat({ provider: "deepseek", model: "deepseek-v4-pro", messages: [{ role: "user", content: "hi" }], params: { "reasoning.enabled": false } })
     ).rejects.toMatchObject({ kind: "server" });
   });
+
+  it("throws server (not a raw TypeError) for a literal JSON null body", async () => {
+    const fetchImpl = vi.fn(async () => new Response("null", { status: 200 }));
+    const gateway = createGateway({ ...CREDS, fetchImpl });
+    await expect(
+      gateway.chat({ provider: "deepseek", model: "deepseek-v4-pro", messages: [{ role: "user", content: "hi" }], params: { "reasoning.enabled": false } })
+    ).rejects.toMatchObject({ kind: "server" });
+  });
+
+  it("integrates the anthropic-messages wire end to end", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: "msg_1",
+            stop_reason: "end_turn",
+            content: [{ type: "text", text: "salut" }],
+            usage: { input_tokens: 2, output_tokens: 1 }
+          }),
+          { status: 200 }
+        )
+    );
+    const gateway = createGateway({ credentials: { anthropic: "sk-ant" }, fetchImpl });
+    const response = await gateway.chat({
+      provider: "anthropic",
+      model: "claude-fable-5",
+      messages: [{ role: "user", content: "hi" }],
+      params: { maxOutputTokens: 2048 }
+    });
+    const [url, init] = fetchImpl.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.anthropic.com/v1/messages");
+    expect((init.headers as Record<string, string>)["x-api-key"]).toBe("sk-ant");
+    expect(JSON.parse(init.body as string)).toEqual({
+      model: "claude-fable-5",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }]
+    });
+    expect(response.content).toEqual([{ type: "text", text: "salut" }]);
+    expect(response.finishReason).toBe("stop");
+  });
 });
 
 describe("gateway.stream", () => {
