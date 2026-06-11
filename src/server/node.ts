@@ -56,6 +56,9 @@ export async function serve(options: ServeOptions = {}): Promise<RunningServer> 
       else response.end();
     } catch (error) {
       if (controller.signal.aborted) return; // client went away mid-stream — nothing left to tell it
+      // Post-headers, the handler's SSE body never errors (gateway.stream yields
+      // in-band error events instead of throwing), so a non-abort pipeline
+      // rejection can't corrupt a partial body — this 500 path only fires pre-headers.
       if (!response.headersSent) response.writeHead(500, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: { kind: "server", message: `unexpected error: ${String(error)}`, retryable: false } }));
     }
