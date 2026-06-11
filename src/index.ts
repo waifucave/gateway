@@ -48,3 +48,15 @@ export type { Codec, CodecRequest, EncodedRequest } from "./codecs/types.js";
 export { authHeaders, buildUrl } from "./codecs/shared.js";
 export { parseSse, type SseEvent } from "./transport/sse.js";
 export { fetchWithRetry, type HttpOptions, type HttpRequest } from "./transport/http.js";
+export {
+  errorResponse,
+  httpStatusForError,
+  jsonResponse,
+  serializeGatewayError,
+  type SerializedGatewayError
+} from "./server/shared.js";
+export { createGatewayHandler, type GatewayHandlerOptions, type GatewayHttpHandler, type ModelSummary } from "./server/handler.js";
+export { envCredentials } from "./server/env.js";
+export { serve, type RunningServer, type ServeOptions } from "./server/node.js";
+export { runSync, type SyncFinding, type SyncOptions, type SyncReport } from "./sync/sync.js";
+export { formatSyncReport } from "./sync/report.js";

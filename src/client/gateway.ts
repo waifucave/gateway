@@ -62,6 +62,13 @@ export class Gateway {
     return validateRequest(this.resolveOrThrow(provider, model), input);
   }
 
+  /**
+   * Abort contract (P1b carryover #3): if `request.signal` aborts, chat()
+   * rejects with the RAW abort reason, not a GatewayError — user aborts must
+   * stay distinguishable from provider failures. stream() differs: mid-stream
+   * aborts arrive as a final `error` event of kind "network". The HTTP layer
+   * normalizes both to a 499 response (see server/shared.ts errorResponse).
+   */
   async chat(request: ChatRequest): Promise<ChatResponse> {
     const { model, encoded, warnings } = this.prepare(request, false);
     const response = await fetchWithRetry(model.providerId, encoded, this.transportOptions(request.signal));
@@ -84,6 +91,7 @@ export class Gateway {
   /**
    * Pre-I/O failures (unknown model, validation, credentials) THROW;
    * transport/provider/decode failures arrive as a final `error` event.
+   * Aborts mid-stream surface as an `error` event of kind "network" (see chat()'s abort contract).
    */
   async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
     const { model, encoded, warnings } = this.prepare(request, true);
