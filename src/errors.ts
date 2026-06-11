@@ -73,6 +73,11 @@ export function extractErrorMessage(body: unknown): string {
     const msg = (body as Record<string, unknown>).message;
     if (typeof msg === "string") return msg;
   }
-  const serialized = JSON.stringify(body);
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(body);
+  } catch {
+    return "(unserializable body)"; // never throw inside error handling
+  }
   return serialized === undefined ? "(no body)" : serialized.slice(0, 500);
 }

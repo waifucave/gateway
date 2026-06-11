@@ -32,6 +32,10 @@ describe("extractErrorMessage", () => {
     expect(extractErrorMessage("")).toBe("(empty body)");
     expect(extractErrorMessage({ weird: true })).toBe('{"weird":true}');
   });
+
+  it("never throws on unserializable bodies (error-path safety)", () => {
+    expect(extractErrorMessage({ big: 1n })).toBe("(unserializable body)");
+  });
 });
 
 describe("GatewayError", () => {
