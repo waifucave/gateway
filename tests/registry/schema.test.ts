@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CapabilityDocSchema } from "../../src/registry/schema.js";
+import { CapabilityDocSchema } from "../helpers/capabilityDocSchema.js";
 
 const dataDir = join(import.meta.dirname, "../../data");
 const files = readdirSync(dataDir).filter((f) => f.endsWith(".json"));
