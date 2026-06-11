@@ -2,9 +2,17 @@ import { GatewayError } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
 import type { Warning } from "../client/types.js";
 
-/** Write a dotted wire path ("thinking.budget_tokens") as nested objects, merging siblings. */
+const UNSAFE_PATH_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Write a dotted wire path ("thinking.budget_tokens") as nested objects, merging siblings.
+ * Path components are registry-controlled wireNames — never pass untrusted input.
+ */
 export function setPath(target: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split(".");
+  for (const part of parts) {
+    if (UNSAFE_PATH_KEYS.has(part)) throw new Error(`unsafe wire path "${path}"`);
+  }
   let cursor = target;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i]!;
