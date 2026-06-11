@@ -237,4 +237,41 @@ describe("openai-responses decodeStream", () => {
       collect(openaiResponsesCodec.decodeStream(model, sse([{ event: "error", data: '{"type":"error","message":"bad"}' }])))
     ).rejects.toThrow(GatewayError);
   });
+
+  it("yields reasoning-delta for reasoning summary text", async () => {
+    const events = await collect(
+      openaiResponsesCodec.decodeStream(
+        model,
+        sse([
+          { event: "response.reasoning_summary_text.delta", data: '{"type":"response.reasoning_summary_text.delta","output_index":0,"delta":"hm"}' }
+        ])
+      )
+    );
+    expect(events[0]).toEqual({ type: "reasoning-delta", text: "hm" });
+  });
+
+  it("synthesizes a done event with finishReason error when the stream truncates before response.completed", async () => {
+    const events = await collect(
+      openaiResponsesCodec.decodeStream(
+        model,
+        sse([
+          { event: "response.created", data: '{"type":"response.created","response":{"id":"resp_t"}}' },
+          { event: "response.output_text.delta", data: '{"type":"response.output_text.delta","output_index":0,"delta":"par"}' }
+        ])
+      )
+    );
+    const done = events.at(-1)!;
+    expect(done).toEqual({
+      type: "done",
+      response: {
+        id: "resp_t",
+        provider: "openai",
+        model: "gpt-5.5",
+        content: [{ type: "text", text: "par" }],
+        finishReason: "error",
+        usage: { inputTokens: 0, outputTokens: 0 },
+        warnings: []
+      }
+    });
+  });
 });

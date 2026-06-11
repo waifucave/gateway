@@ -139,6 +139,11 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
 async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEvent>): AsyncGenerator<StreamEvent> {
   const toolIndexByOutputIndex = new Map<number, number>();
   let nextToolIndex = 0;
+  // accumulated only for the truncated-stream fallback below
+  let id = "";
+  let text = "";
+  let reasoning = "";
+  const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
   for await (const event of events) {
     let data: Record<string, unknown> & { type?: string };
     try {
@@ -147,11 +152,15 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       throw new GatewayError("server", `${model.providerId} sent a malformed SSE chunk`, { provider: model.providerId, raw: event.data, cause });
     }
     const type = event.event ?? data.type;
-    if (type === "response.output_item.added") {
+    if (type === "response.created") {
+      id = (data.response as { id?: string } | undefined)?.id ?? id;
+    } else if (type === "response.output_item.added") {
       const item = data.item as { type?: string; call_id?: string; name?: string } | undefined;
       if (item?.type === "function_call") {
         const index = nextToolIndex++;
+        // assumes OpenAI's documented added-before-delta ordering per output_index
         toolIndexByOutputIndex.set(data.output_index as number, index);
+        toolCalls.push({ id: item.call_id ?? `call_${index}`, name: item.name ?? "", arguments: "" });
         yield {
           type: "tool-call-delta",
           index,
@@ -161,12 +170,22 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
         };
       }
     } else if (type === "response.output_text.delta") {
-      if (typeof data.delta === "string" && data.delta !== "") yield { type: "text-delta", text: data.delta };
+      if (typeof data.delta === "string" && data.delta !== "") {
+        text += data.delta;
+        yield { type: "text-delta", text: data.delta };
+      }
     } else if (type === "response.reasoning_summary_text.delta") {
-      if (typeof data.delta === "string" && data.delta !== "") yield { type: "reasoning-delta", text: data.delta };
+      if (typeof data.delta === "string" && data.delta !== "") {
+        reasoning += data.delta;
+        yield { type: "reasoning-delta", text: data.delta };
+      }
     } else if (type === "response.function_call_arguments.delta") {
       const index = toolIndexByOutputIndex.get(data.output_index as number) ?? 0;
-      if (typeof data.delta === "string") yield { type: "tool-call-delta", index, argumentsDelta: data.delta };
+      if (typeof data.delta === "string") {
+        const entry = toolCalls[index];
+        if (entry) entry.arguments += data.delta;
+        yield { type: "tool-call-delta", index, argumentsDelta: data.delta };
+      }
     } else if (type === "response.completed") {
       const response = decodeResponse(model, data.response);
       yield { type: "usage", usage: response.usage };
@@ -175,8 +194,27 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     } else if (type === "response.failed" || type === "error") {
       throw new GatewayError("server", extractErrorMessage(data.response ?? data), { provider: model.providerId, raw: data });
     }
-    // all other event types (response.created, response.in_progress, …) are ignored
+    // all other event types (response.in_progress, …) are ignored
   }
+
+  // Truncated stream (no response.completed): the Codec contract still requires
+  // a done event — synthesize one from accumulated deltas with finishReason "error".
+  const content: ContentBlock[] = [];
+  if (reasoning !== "") content.push({ type: "reasoning", text: reasoning });
+  if (text !== "") content.push({ type: "text", text });
+  for (const call of toolCalls) content.push({ type: "toolCall", id: call.id, name: call.name, arguments: call.arguments || "{}" });
+  yield {
+    type: "done",
+    response: {
+      id,
+      provider: model.providerId,
+      model: model.modelId,
+      content,
+      finishReason: "error",
+      usage: { inputTokens: 0, outputTokens: 0 },
+      warnings: []
+    }
+  };
 }
 
 export const openaiResponsesCodec: Codec = { wire: "openai-responses", encode, decodeResponse, decodeStream };
