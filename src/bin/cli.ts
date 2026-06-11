@@ -52,12 +52,18 @@ async function runSyncCommand(args: string[], io: CliIo): Promise<number> {
     io.logError(`invalid arguments: ${error instanceof Error ? error.message : String(error)}\n${USAGE}`);
     return 2;
   }
-  const report = await runSync({
-    credentials: envCredentials(io.env ?? process.env),
-    ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
-    ...(values.provider !== undefined ? { providers: values.provider } : {}),
-    ...(values["data-dir"] !== undefined ? { dataDir: values["data-dir"] } : {})
-  });
+  let report;
+  try {
+    report = await runSync({
+      credentials: envCredentials(io.env ?? process.env),
+      ...(io.fetchImpl !== undefined ? { fetchImpl: io.fetchImpl } : {}),
+      ...(values.provider !== undefined ? { providers: values.provider } : {}),
+      ...(values["data-dir"] !== undefined ? { dataDir: values["data-dir"] } : {})
+    });
+  } catch (error) {
+    io.logError(`sync failed: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
   io.log(values.json === true ? JSON.stringify(report, null, 2) : formatSyncReport(report));
   return report.ok ? 0 : 1;
 }

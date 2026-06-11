@@ -86,4 +86,11 @@ describe("runCli sync", () => {
   it("rejects unknown sync flags with exit 2", async () => {
     expect(await runCli(["sync", "--bogus"], io())).toBe(2);
   });
+
+  it("exits 1 with a clean message when the data dir is unreadable", async () => {
+    const testIo = io();
+    expect(await runCli(["sync", "--data-dir", "/nonexistent/gateway-data-dir"], testIo)).toBe(1);
+    expect(testIo.errors.join("\n")).toContain("sync failed:");
+    expect(testIo.logs).toEqual([]);
+  });
 });
