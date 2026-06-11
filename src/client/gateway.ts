@@ -71,6 +71,10 @@ export class Gateway {
     } catch (cause) {
       throw new GatewayError("server", `${model.providerId} returned a non-JSON response body`, { provider: model.providerId, cause });
     }
+    // codecs cast payload to their wire shape — a literal JSON null/scalar must not reach them
+    if (payload === null || typeof payload !== "object") {
+      throw new GatewayError("server", `${model.providerId} returned an unexpected non-object response`, { provider: model.providerId, raw: payload });
+    }
     const decoded = codecFor(model.wire).decodeResponse(model, payload);
     decoded.warnings = [...warnings, ...decoded.warnings];
     if (this.options.includeRaw) decoded.raw = payload;
