@@ -88,13 +88,16 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Re
     } else if (typeof message.content === "string") {
       out.push({ role: "assistant", content: message.content });
     } else {
+      // Text blocks are joined into the single wire `content` string; text/toolCall
+      // interleaving cannot be represented on this wire and is intentionally lost.
       const text = message.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("");
       const reasoning = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning").map((b) => b.text).join("");
       const toolCalls = message.content.filter((b): b is ToolCallBlock => b.type === "toolCall");
       out.push(
         pruneUndefined({
           role: "assistant",
-          content: text !== "" ? text : null,
+          // content:null is only valid alongside tool_calls; otherwise the wire requires a string
+          content: text !== "" ? text : toolCalls.length ? null : "",
           tool_calls: toolCalls.length
             ? toolCalls.map((call) => ({ id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } }))
             : undefined,
@@ -144,6 +147,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
 
 function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
   const wire = payload as WirePayload;
+  // n>1 is not part of the unified API; only the first choice is surfaced
   const choice = wire.choices?.[0];
   if (!choice) {
     throw new GatewayError("server", `${model.providerId} response has no choices`, { provider: model.providerId, raw: payload });

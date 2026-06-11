@@ -163,6 +163,20 @@ describe("openai-chat encode — structure", () => {
     expect(encoded.body.messages).toEqual([{ role: "assistant", content: "answer" }]);
   });
 
+  it("never emits content:null without tool_calls (reasoning-only turn on a non-round-trip model)", () => {
+    const messages: ChatMessage[] = [{ role: "assistant", content: [{ type: "reasoning", text: "thought" }] }];
+    const encoded = goldenEncode("openrouter", "deepseek/deepseek-v3.2", { messages });
+    expect(encoded.body.messages).toEqual([{ role: "assistant", content: "" }]);
+  });
+
+  it("keeps assistant string content verbatim", () => {
+    const encoded = goldenEncode("deepseek", "deepseek-v4-flash", {
+      params: { "reasoning.enabled": false },
+      messages: [{ role: "assistant", content: "previous answer" }]
+    });
+    expect(encoded.body.messages).toEqual([{ role: "assistant", content: "previous answer" }]);
+  });
+
   it("encodes image blocks as data-URL image_url parts", () => {
     const encoded = goldenEncode("deepseek", "deepseek-v4-flash", {
       params: { "reasoning.enabled": false },
