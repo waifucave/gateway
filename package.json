@@ -16,6 +16,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./fastify": {
+      "types": "./dist/server/fastify.d.ts",
+      "import": "./dist/server/fastify.js"
     }
   },
   "files": [
