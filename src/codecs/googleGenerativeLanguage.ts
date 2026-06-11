@@ -83,6 +83,9 @@ function encodeContents(
           toolNameById.set(block.id, block.name);
           return { functionCall: { name: block.name, args: parseArguments(model.providerId, block.name, block.arguments) } };
         }
+        // Reasoning is re-encoded unconditionally (not gated on features.reasoningRoundTrip,
+        // unlike openai-chat): Gemini 3 requires thoughtSignature round-trip on tool loops,
+        // mirroring the anthropic-messages pattern.
         return pruneUndefined({ text: block.text, thought: true, thoughtSignature: block.signature });
       });
       push("model", parts);
@@ -129,6 +132,9 @@ function decodeParts(parts: GooglePart[], toolStartIndex: number): { blocks: Con
   let toolCount = 0;
   for (const part of parts) {
     if (part.functionCall) {
+      // LOSSY: a thoughtSignature carried on a functionCall part is dropped —
+      // ToolCallBlock has no signature field. Revisit if Gemini 3 tool loops
+      // need it round-tripped (tracked for the app-integration phase).
       blocks.push({
         type: "toolCall",
         id: part.functionCall.id ?? `call_${toolStartIndex + toolCount}`,
