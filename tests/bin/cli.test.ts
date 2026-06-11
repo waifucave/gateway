@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCli, type CliIo } from "../../src/bin/cli.js";
 import type { RunningServer } from "../../src/server/node.js";
@@ -43,5 +44,46 @@ describe("runCli", () => {
     const testIo = io();
     expect(await runCli(["serve", "--port", "0", "--host", "203.0.113.1"], testIo)).toBe(1);
     expect(testIo.errors.join("\n")).toContain("failed to start");
+  });
+});
+
+const syncDataDir = join(import.meta.dirname, "../fixtures/sync");
+
+function syncFetch(openrouterData: unknown) {
+  return (async (input: string | URL | Request) =>
+    String(input).includes("openrouter.ai")
+      ? new Response(JSON.stringify(openrouterData), { status: 200 })
+      : new Response("{}", { status: 500 })) as typeof fetch;
+}
+
+describe("runCli sync", () => {
+  const CLEAN = {
+    data: [{ id: "drift/drift-model", context_length: 100000, pricing: { prompt: "0.0000005", completion: "0.0000015" } }]
+  };
+
+  it("exits 0 and prints a clean report when nothing drifted", async () => {
+    const testIo = io({ fetchImpl: syncFetch(CLEAN) });
+    expect(await runCli(["sync", "--data-dir", syncDataDir, "--provider", "openrouter"], testIo)).toBe(0);
+    expect(testIo.logs.join("\n")).toContain("drift check clean");
+  });
+
+  it("exits 1 and prints findings when the registry drifted", async () => {
+    const testIo = io({ fetchImpl: syncFetch({ data: [] }) });
+    expect(await runCli(["sync", "--data-dir", syncDataDir, "--provider", "openrouter"], testIo)).toBe(1);
+    const output = testIo.logs.join("\n");
+    expect(output).toContain("ERROR openrouter:drift/drift-model");
+    expect(output).toContain("drift check FAILED");
+  });
+
+  it("emits machine-readable JSON with --json", async () => {
+    const testIo = io({ fetchImpl: syncFetch(CLEAN) });
+    expect(await runCli(["sync", "--data-dir", syncDataDir, "--provider", "openrouter", "--json"], testIo)).toBe(0);
+    const parsed = JSON.parse(testIo.logs.join("\n")) as { ok: boolean; findings: unknown[]; providersChecked: string[] };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.providersChecked).toEqual(["openrouter"]);
+  });
+
+  it("rejects unknown sync flags with exit 2", async () => {
+    expect(await runCli(["sync", "--bogus"], io())).toBe(2);
   });
 });
