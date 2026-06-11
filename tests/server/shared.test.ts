@@ -88,4 +88,12 @@ describe("errorResponse", () => {
     controller.abort();
     expect(errorResponse(new GatewayError("unsupported_parameter", "x"), controller.signal).status).toBe(400);
   });
+
+  it("never throws, even for pathological error values", async () => {
+    const evil = { toString: () => { throw new Error("nope"); } };
+    expect(errorResponse(evil).status).toBe(500);
+    expect(errorResponse(null).status).toBe(500);
+    const body = (await errorResponse("plain failure").json()) as { error: { message: string } };
+    expect(body.error.message).toBe("unexpected error: plain failure");
+  });
 });
