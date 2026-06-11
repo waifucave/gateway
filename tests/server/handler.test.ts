@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createGatewayHandler } from "../../src/server/handler.js";
 import { envCredentials } from "../../src/server/env.js";
+import { jsonFetch } from "../helpers/http.js";
 
 const get = (handler: ReturnType<typeof createGatewayHandler>, path: string, init?: RequestInit) =>
   handler.handle(new Request(`http://gateway.test${path}`, init));
@@ -152,5 +153,204 @@ describe("routing", () => {
     expect((await get(handler, "/v1/providers/")).status).toBe(200);
     expect((await get(handler, "/v1/models/deepseek/deepseek-v4-pro/")).status).toBe(200);
     expect((await get(handler, "/v1/models/deepseek/deepseek%2Dv4%2Dpro")).status).toBe(200);
+  });
+});
+
+const post = (handler: ReturnType<typeof createGatewayHandler>, path: string, body: unknown) =>
+  handler.handle(
+    new Request(`http://gateway.test${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    })
+  );
+
+describe("POST /v1/validate", () => {
+  it("returns the pinned ValidationResult for an out-of-range param", async () => {
+    const handler = createGatewayHandler();
+    const response = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      params: { temperature: 99 }
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: false,
+      violations: [{ param: "temperature", code: "out_of_range", message: "temperature must be in [0, 2]" }],
+      warnings: [
+        { ruleId: "thinking-drops-sampling", param: "temperature", code: "dropped" },
+        { ruleId: "thinking-drops-sampling", param: "topP", code: "dropped" }
+      ],
+      effectiveParams: { "reasoning.enabled": true, "reasoning.effort": "high" }
+    });
+  });
+
+  it("reports forbidden tool choice under thinking (UI live-gating contract)", async () => {
+    const handler = createGatewayHandler();
+    const response = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      params: { "reasoning.enabled": true },
+      toolChoice: "required"
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { ok: boolean; violations: unknown[] };
+    expect(body.ok).toBe(false);
+    expect(body.violations).toContainEqual({
+      ruleId: "thinking-no-forced-tools",
+      param: "toolChoice",
+      code: "forbidden_value",
+      value: "required"
+    });
+  });
+
+  it("accepts responseFormat as object or string", async () => {
+    const handler = createGatewayHandler();
+    // gpt-5.5 supports json_schema; deepseek-v4-pro does not
+    const objectForm = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      params: { "reasoning.enabled": false },
+      responseFormat: { type: "json_schema", schema: {} }
+    });
+    const stringForm = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      params: { "reasoning.enabled": false },
+      responseFormat: "json_schema"
+    });
+    for (const response of [objectForm, stringForm]) {
+      const body = (await response.json()) as { ok: boolean; violations: Array<{ code: string }> };
+      expect(body.ok).toBe(false);
+      expect(body.violations).toContainEqual(expect.objectContaining({ code: "unsupported_response_format" }));
+    }
+  });
+
+  it("404s unknown models and 400s malformed bodies", async () => {
+    const handler = createGatewayHandler();
+    expect((await post(handler, "/v1/validate", { provider: "deepseek", model: "nope", params: {} })).status).toBe(404);
+    expect((await post(handler, "/v1/validate", { provider: "", model: "x" })).status).toBe(400);
+    expect((await post(handler, "/v1/validate", { provider: "deepseek", model: "deepseek-v4-pro", params: 5 })).status).toBe(400);
+    expect((await post(handler, "/v1/validate", [1, 2])).status).toBe(400);
+    const notJson = await handler.handle(
+      new Request("http://gateway.test/v1/validate", { method: "POST", body: "{not json", headers: { "content-type": "application/json" } })
+    );
+    expect(notJson.status).toBe(400);
+    expect(await notJson.json()).toEqual({
+      error: { kind: "invalid_request", message: "request body must be valid JSON", retryable: false }
+    });
+  });
+});
+
+describe("POST /v1/chat (non-streaming)", () => {
+  const OK_PAYLOAD = {
+    id: "cmpl_1",
+    choices: [{ message: { content: "hello" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 3, completion_tokens: 1 }
+  };
+
+  it("encodes through the real pipeline and returns the normalized ChatResponse", async () => {
+    const fetchImpl = jsonFetch(OK_PAYLOAD);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { temperature: 0.7, "reasoning.enabled": true }
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/json");
+
+    // P1b golden wire body, verbatim
+    const [url, init] = fetchImpl.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.deepseek.com/chat/completions");
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-test");
+    expect(JSON.parse(init.body as string)).toEqual({
+      model: "deepseek-v4-pro",
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
+      messages: [{ role: "user", content: "hi" }]
+    });
+
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: "cmpl_1",
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      content: [{ type: "text", text: "hello" }],
+      finishReason: "stop",
+      usage: { inputTokens: 3, outputTokens: 1 }
+    });
+    expect(body.warnings).toEqual([
+      {
+        code: "param_dropped",
+        param: "temperature",
+        ruleId: "thinking-drops-sampling",
+        message: "temperature was dropped by constraint rule thinking-drops-sampling"
+      },
+      {
+        code: "param_dropped",
+        param: "topP",
+        ruleId: "thinking-drops-sampling",
+        message: "topP was dropped by constraint rule thinking-drops-sampling"
+      }
+    ]);
+    expect(body.raw).toBeUndefined();
+  });
+
+  it("maps gateway failures to HTTP statuses: validation 400, missing credential 401, provider 401 → 401", async () => {
+    const noCreds = createGatewayHandler({ fetchImpl: jsonFetch(OK_PAYLOAD) });
+    const authResponse = await post(noCreds, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }]
+    });
+    expect(authResponse.status).toBe(401);
+    expect(await authResponse.json()).toEqual({
+      error: { kind: "auth", message: "no credential configured for provider deepseek", provider: "deepseek", retryable: false }
+    });
+
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
+    const validation = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      toolChoice: "required",
+      params: { "reasoning.enabled": true }
+    });
+    expect(validation.status).toBe(400);
+    const validationBody = (await validation.json()) as { error: { kind: string } };
+    expect(validationBody.error.kind).toBe("unsupported_parameter");
+
+    const upstream401 = createGatewayHandler({
+      credentials: { deepseek: "sk-bad" },
+      fetchImpl: jsonFetch({ error: { message: "invalid api key" } }, 401)
+    });
+    const providerError = await post(upstream401, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false }
+    });
+    expect(providerError.status).toBe(401);
+    const providerBody = (await providerError.json()) as { error: { kind: string; status: number } };
+    expect(providerBody.error).toMatchObject({ kind: "auth", status: 401, provider: "deepseek" });
+  });
+
+  it("404s unknown models and 400s missing messages", async () => {
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
+    expect((await post(handler, "/v1/chat", { provider: "deepseek", model: "nope", messages: [] })).status).toBe(404);
+    expect((await post(handler, "/v1/chat", { provider: "deepseek", model: "deepseek-v4-pro" })).status).toBe(400);
+  });
+
+  it("exposes raw only when the handler was created with includeRaw", async () => {
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD), includeRaw: true });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": false }
+    });
+    expect(((await response.json()) as { raw: unknown }).raw).toEqual(OK_PAYLOAD);
   });
 });
