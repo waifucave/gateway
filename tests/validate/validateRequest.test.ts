@@ -118,4 +118,24 @@ describe("unverified descriptors and placeholder caps (found live in Discord Wai
       ).toEqual([]);
     }
   });
+
+  it("Gemini/Gemma forced and named tool choice pass validation (live-probed via mode ANY, 2026-06-12)", () => {
+    const probed = [
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-3-flash-preview",
+      "gemini-3.1-flash-lite",
+      "gemma-4-26b-a4b-it",
+      "gemma-4-31b-it"
+    ];
+    for (const id of probed) {
+      const model = registry.resolve("google-ai-studio", id)!;
+      expect(validateRequest(model, { params: {}, toolChoice: "required" }).ok, id).toBe(true);
+      expect(validateRequest(model, { params: {}, toolChoice: { name: "x" } }).ok, id).toBe(true);
+    }
+    // gemini-2.5-pro was probed too: mode ANY is accepted but does NOT force a
+    // call, so its conservative ["auto","none"] cell stands.
+    const pro = registry.resolve("google-ai-studio", "gemini-2.5-pro")!;
+    expect(validateRequest(pro, { params: {}, toolChoice: "required" }).ok).toBe(false);
+  });
 });

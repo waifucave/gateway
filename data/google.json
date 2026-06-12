@@ -204,7 +204,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": true,
         "parallelDisable": false,
@@ -371,7 +373,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": true,
         "parallelDisable": false,
@@ -707,7 +711,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": false,
         "parallelDisable": false,
@@ -880,7 +886,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": true,
         "parallelDisable": false,
@@ -1229,7 +1237,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": false,
         "parallelDisable": false,
@@ -1400,7 +1410,9 @@
         "supported": true,
         "toolChoice": [
           "auto",
-          "none"
+          "none",
+          "required",
+          "named"
         ],
         "parallel": false,
         "parallelDisable": false,
