@@ -218,7 +218,7 @@
       },
       "assistantPrefill": true,
       "systemRole": "system",
-      "multipleSystemMessages": false,
+      "multipleSystemMessages": true,
       "reasoningRoundTrip": true
     },
     "params": {
@@ -422,7 +422,7 @@
       },
       "assistantPrefill": true,
       "systemRole": "system",
-      "multipleSystemMessages": false,
+      "multipleSystemMessages": true,
       "reasoningRoundTrip": true
     },
     "params": {
