@@ -25,7 +25,10 @@ describe("capability data files", () => {
     }
   });
 
-  it("has 54 docs with unique families and unique (provider, model) routes", () => {
+  it("has 53 docs with unique families and unique (provider, model) routes", () => {
+    // openrouter/owl-alpha's whole family was dropped 2026-07-02: it's gone
+    // from OpenRouter's live public /models list (no "owl"/"alpha" id at all)
+    // and had no other route to fall back to.
     const families = new Set<string>();
     const routes = new Set<string>();
     let count = 0;
@@ -41,6 +44,6 @@ describe("capability data files", () => {
         }
       }
     }
-    expect(count).toBe(54);
+    expect(count).toBe(53);
   });
 });

@@ -14,38 +14,6 @@
           "endpoint": "/chat/completions",
           "anthropicEndpoint": "https://api.xiaomimimo.com/anthropic/v1/messages"
         }
-      },
-      {
-        "providerId": "openrouter",
-        "modelId": "xiaomi/mimo-v2-flash",
-        "wire": "openai-chat",
-        "overrides": {
-          "contextTokens": 262144,
-          "maxOutputTokens": 65536,
-          "pricing": {
-            "inputPerMTok": 0.1,
-            "outputPerMTok": 0.3,
-            "cachedInputPerMTok": 0.01
-          },
-          "modalities": [
-            "text"
-          ],
-          "supportedParameters": [
-            "frequency_penalty",
-            "include_reasoning",
-            "max_tokens",
-            "presence_penalty",
-            "reasoning",
-            "response_format",
-            "stop",
-            "temperature",
-            "tool_choice",
-            "tools",
-            "top_p"
-          ],
-          "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
-        }
       }
     ],
     "limits": {
@@ -157,7 +125,7 @@
           "contextTokens": 1048576,
           "maxOutputTokens": 131072,
           "pricing": {
-            "inputPerMTok": 0.14,
+            "inputPerMTok": 0.105,
             "outputPerMTok": 0.28,
             "cachedInputPerMTok": 0.0028
           },

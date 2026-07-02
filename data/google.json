@@ -1356,7 +1356,7 @@
           "maxOutputTokens": 8192,
           "pricing": {
             "inputPerMTok": 0.12,
-            "outputPerMTok": 0.36,
+            "outputPerMTok": 0.35,
             "cachedInputPerMTok": 0.09
           },
           "modalities": [
