@@ -124,9 +124,20 @@ jobs:
             exit 0
           fi
 
-          REMOTE_SHASUM="$(npm view "$PACKAGE_NAME" dist.shasum)"
-          PACK_JSON="$(npm pack --dry-run --json)"
-          LOCAL_SHASUM="$(node -e "console.log(JSON.parse(process.argv[1])[0].shasum)" "$PACK_JSON")"
+          if ! REMOTE_SHASUM="$(npm view "$PACKAGE_NAME" dist.shasum)" || [ -z "$REMOTE_SHASUM" ]; then
+            echo "::error::failed to fetch remote shasum for $PACKAGE_NAME@$PUBLISHED_VERSION"
+            exit 1
+          fi
+
+          if ! PACK_JSON="$(npm pack --dry-run --json)" || [ -z "$PACK_JSON" ]; then
+            echo "::error::failed to generate npm pack JSON for $PACKAGE_NAME@$LOCAL_VERSION"
+            exit 1
+          fi
+
+          if ! LOCAL_SHASUM="$(node -e "console.log(JSON.parse(process.argv[1])[0].shasum)" "$PACK_JSON")" || [ -z "$LOCAL_SHASUM" ]; then
+            echo "::error::failed to parse local shasum from npm pack output"
+            exit 1
+          fi
 
           echo "remote shasum: $REMOTE_SHASUM"
           echo "local shasum:  $LOCAL_SHASUM"
