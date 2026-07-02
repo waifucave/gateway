@@ -72,6 +72,84 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 type ParsedBody = { ok: true; body: Record<string, unknown> } | { ok: false; response: Response };
 
+/**
+ * P1c carryover: handler.ts previously validated only top-level request shapes
+ * (messages is an array, tools is an array, ...) — malformed ELEMENTS inside
+ * them (a message missing `role`, a content block with a bogus `type`, a tool
+ * without `name`) reached the codecs and either silently misencoded or threw a
+ * raw TypeError that surfaced as a 500 `{kind:"server"}`. These checks are
+ * structural only (roles/types/required fields) — semantics stay in codecs.
+ */
+const CHAT_ROLES = new Set(["system", "user", "assistant", "tool"]);
+
+function validateContentBlock(block: unknown, messageIndex: number, blockIndex: number): string | undefined {
+  const prefix = `messages[${messageIndex}].content[${blockIndex}]`;
+  if (!isPlainObject(block)) return `${prefix} must be an object`;
+  switch (block.type) {
+    case "text":
+      return typeof block.text === "string" ? undefined : `${prefix}: text block requires a string "text"`;
+    case "image":
+      return typeof block.mimeType === "string" && typeof block.data === "string"
+        ? undefined
+        : `${prefix}: image block requires "mimeType" and "data" strings`;
+    case "reasoning":
+      return typeof block.text === "string" ? undefined : `${prefix}: reasoning block requires a string "text"`;
+    case "toolCall":
+      if (typeof block.id !== "string" || block.id === "") return `${prefix}: toolCall block requires an "id"`;
+      if (typeof block.name !== "string" || block.name === "") return `${prefix}: toolCall block requires a "name"`;
+      if (typeof block.arguments !== "string") return `${prefix}: toolCall block requires "arguments"`;
+      return undefined;
+    default:
+      return `${prefix}: unknown content block type ${JSON.stringify(block.type)}`;
+  }
+}
+
+function validateChatMessages(messages: unknown[]): string | undefined {
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    if (!isPlainObject(message)) return `messages[${i}] must be an object`;
+    if (typeof message.role !== "string" || !CHAT_ROLES.has(message.role)) {
+      return `messages[${i}]: missing or invalid "role"`;
+    }
+    if (message.role === "tool") {
+      if (typeof message.toolCallId !== "string" || message.toolCallId === "") return `messages[${i}]: "toolCallId" is required`;
+      if (typeof message.content !== "string") return `messages[${i}]: "content" must be a string`;
+      continue;
+    }
+    if (message.role === "system") {
+      if (typeof message.content !== "string") return `messages[${i}]: "content" must be a string`;
+      continue;
+    }
+    // user / assistant: content is a string or an array of content blocks
+    if (typeof message.content === "string") continue;
+    if (!Array.isArray(message.content)) return `messages[${i}]: "content" must be a string or an array`;
+    for (let j = 0; j < message.content.length; j++) {
+      const error = validateContentBlock(message.content[j], i, j);
+      if (error) return error;
+    }
+  }
+  return undefined;
+}
+
+function validateTools(tools: unknown[]): string | undefined {
+  for (let i = 0; i < tools.length; i++) {
+    const tool = tools[i];
+    if (!isPlainObject(tool)) return `tools[${i}] must be an object`;
+    if (typeof tool.name !== "string" || tool.name === "") return `tools[${i}]: missing "name"`;
+    if (!isPlainObject(tool.parameters)) return `tools[${i}]: "parameters" must be an object`;
+    if (tool.description !== undefined && typeof tool.description !== "string") return `tools[${i}]: "description" must be a string`;
+    if (tool.strict !== undefined && typeof tool.strict !== "boolean") return `tools[${i}]: "strict" must be a boolean`;
+  }
+  return undefined;
+}
+
+/** Shared by /v1/chat and /v1/validate — both accept a raw toolChoice. */
+function validateToolChoice(value: unknown): string | undefined {
+  if (value === undefined || value === "auto" || value === "none" || value === "required") return undefined;
+  if (isPlainObject(value) && typeof value.name === "string" && value.name !== "") return undefined;
+  return 'toolChoice must be "auto", "none", "required", or { name: string }';
+}
+
 async function readJsonBody(request: Request): Promise<ParsedBody> {
   let parsed: unknown;
   try {
@@ -164,6 +242,8 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     if (!target.ok) return target.response;
     const { params, toolChoice, responseFormat, stream } = parsed.body;
     if (params !== undefined && !isPlainObject(params)) return badRequest("params must be an object");
+    const toolChoiceError = validateToolChoice(toolChoice);
+    if (toolChoiceError) return badRequest(toolChoiceError);
     try {
       const result = gateway.validate(target.provider, target.model, {
         params: (params as Record<string, unknown> | undefined) ?? {},
@@ -188,6 +268,14 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     if (body.passthrough !== undefined && !isPlainObject(body.passthrough)) return badRequest("passthrough must be an object");
     if (body.tools !== undefined && !Array.isArray(body.tools)) return badRequest("tools must be an array");
     if (body.responseFormat !== undefined && !isPlainObject(body.responseFormat)) return badRequest("responseFormat must be an object");
+    const messagesError = validateChatMessages(body.messages);
+    if (messagesError) return badRequest(messagesError);
+    if (Array.isArray(body.tools)) {
+      const toolsError = validateTools(body.tools);
+      if (toolsError) return badRequest(toolsError);
+    }
+    const toolChoiceError = validateToolChoice(body.toolChoice);
+    if (toolChoiceError) return badRequest(toolChoiceError);
     const chatRequest: ChatRequest = {
       provider: target.provider,
       model: target.model,

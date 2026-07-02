@@ -240,6 +240,20 @@ describe("POST /v1/validate", () => {
       error: { kind: "invalid_request", message: "request body must be valid JSON", retryable: false }
     });
   });
+
+  it("400s a malformed toolChoice (P1c carryover) instead of silently misreading it", async () => {
+    const handler = createGatewayHandler();
+    const response = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      params: {},
+      toolChoice: { missingName: true }
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { kind: string; message: string } };
+    expect(body.error.kind).toBe("invalid_request");
+    expect(body.error.message).toBe('toolChoice must be "auto", "none", "required", or { name: string }');
+  });
 });
 
 describe("POST /v1/chat (non-streaming)", () => {
@@ -380,6 +394,134 @@ describe("POST /v1/chat (non-streaming)", () => {
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: { message: string } };
     expect(body.error.message).toBe("tools must be an array");
+  });
+});
+
+describe("POST /v1/chat element validation (P1c carryover)", () => {
+  const OK_PAYLOAD = {
+    id: "cmpl_1",
+    choices: [{ message: { content: "hello" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 3, completion_tokens: 1 }
+  };
+  const handler = () => createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
+  const chat = (body: unknown) => post(handler(), "/v1/chat", body);
+
+  it("400s a message missing role, naming the offending index", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }, { content: "no role here" }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { kind: string; message: string } };
+    expect(body.error.kind).toBe("invalid_request");
+    expect(body.error.message).toBe('messages[1]: missing or invalid "role"');
+  });
+
+  it("400s a message with an unrecognized role", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "bot", content: "hi" }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0]: missing or invalid "role"');
+  });
+
+  it("400s a content block with an unknown type, naming message and block index", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "assistant", content: [{ type: "bogus" }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: unknown content block type "bogus"');
+  });
+
+  it("400s a toolCall content block missing id", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "assistant", content: [{ type: "toolCall", name: "lookup", arguments: "{}" }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: toolCall block requires an "id"');
+  });
+
+  it("400s a text content block missing text", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: [{ type: "text" }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: text block requires a string "text"');
+  });
+
+  it("400s a tool-role message missing toolCallId", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "tool", content: "result" }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0]: "toolCallId" is required');
+  });
+
+  it("400s a tool missing name, naming the tool index", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ parameters: {} }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('tools[0]: missing "name"');
+  });
+
+  it("400s a tool missing parameters", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [{ name: "lookup" }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('tools[0]: "parameters" must be an object');
+  });
+
+  it("400s a malformed named toolChoice", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      toolChoice: { notName: "x" }
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('toolChoice must be "auto", "none", "required", or { name: string }');
+  });
+
+  it("still reaches the codec for a fully valid, structurally rich request (control)", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [
+        { role: "system", content: "sys" },
+        { role: "user", content: [{ type: "text", text: "hi" }] },
+        { role: "assistant", content: [{ type: "toolCall", id: "call_1", name: "lookup", arguments: "{}" }] },
+        { role: "tool", toolCallId: "call_1", content: "42" }
+      ],
+      params: { "reasoning.enabled": false }
+    });
+    expect(response.status).toBe(200);
   });
 });
 
