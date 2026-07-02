@@ -1,0 +1,139 @@
+name: Gateway CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly live drift check against provider model lists (Mondays 06:00 UTC).
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_LOGLEVEL: error
+  NPM_CONFIG_PROGRESS: "false"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  drift:
+    name: Live drift check
+    needs: test
+    runs-on: ubuntu-latest
+    # Exits 0 when the capability registry matches provider model lists, 1 on
+    # drift or a hard failure. Not marked continue-on-error, so this fails the
+    # workflow on push/PR and on the weekly schedule alike (kept simple, per
+    # design — no separate "file an issue" path for scheduled runs).
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: gateway sync (drift check)
+        # Providers below are skipped by sync.ts when their credentialEnv secret
+        # isn't set in this repo (see src/registry/providers.ts) — that's by
+        # design, not a failure; only configured secrets get live-checked.
+        # OpenRouter's /models endpoint is public, so it's always checked
+        # regardless of whether OPENROUTER_API_KEY is set.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          STEPFUN_API_KEY: ${{ secrets.STEPFUN_API_KEY }}
+          XIAOMI_API_KEY: ${{ secrets.XIAOMI_API_KEY }}
+        run: node dist/bin/gateway.js sync
+
+  publish-freshness:
+    name: Publish freshness guard
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        # The guard compares BUILT tarball contents (dist/ is gitignored, so
+        # npm pack needs a fresh build to produce the real published payload).
+        run: npm run build
+
+      - name: Verify publish freshness
+        shell: bash
+        run: |
+          set -uo pipefail
+          PACKAGE_NAME="@waifucave/gateway"
+          LOCAL_VERSION="$(node -p "require('./package.json').version")"
+
+          if ! PUBLISHED_VERSION="$(npm view "$PACKAGE_NAME" version 2>/dev/null)" || [ -z "$PUBLISHED_VERSION" ]; then
+            echo "no published version found for $PACKAGE_NAME yet — freshness check passes trivially"
+            exit 0
+          fi
+
+          echo "published version: $PUBLISHED_VERSION"
+          echo "local package.json version: $LOCAL_VERSION"
+
+          if [ "$PUBLISHED_VERSION" != "$LOCAL_VERSION" ]; then
+            echo "local version differs from the published version — nothing to compare"
+            exit 0
+          fi
+
+          REMOTE_SHASUM="$(npm view "$PACKAGE_NAME" dist.shasum)"
+          PACK_JSON="$(npm pack --dry-run --json)"
+          LOCAL_SHASUM="$(node -e "console.log(JSON.parse(process.argv[1])[0].shasum)" "$PACK_JSON")"
+
+          echo "remote shasum: $REMOTE_SHASUM"
+          echo "local shasum:  $LOCAL_SHASUM"
+
+          if [ "$REMOTE_SHASUM" != "$LOCAL_SHASUM" ]; then
+            echo "::error::package.json version ${PUBLISHED_VERSION} is already published with different contents — bump the version"
+            exit 1
+          fi
+
+          echo "freshness check passed: version $LOCAL_VERSION matches published contents"
