@@ -1,6 +1,6 @@
 {
   "name": "@waifucave/gateway",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Provider-agnostic LLM normalization layer: capability registry, parameter validation, unified chat API",
   "license": "MIT",
   "type": "module",
