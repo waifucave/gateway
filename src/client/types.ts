@@ -12,7 +12,8 @@ export type ImageBlock = { type: "image"; mimeType: string; data: string };
 export type ReasoningBlock = { type: "reasoning"; text: string; signature?: string; redacted?: boolean; data?: string };
 
 /** `arguments` is the raw JSON text of the call arguments (consumers parse it; codecs that need objects parse internally). */
-export type ToolCallBlock = { type: "toolCall"; id: string; name: string; arguments: string };
+// signature: Gemini 3 thoughtSignature captured at decode; round-tripped on replay (other providers ignore it).
+export type ToolCallBlock = { type: "toolCall"; id: string; name: string; arguments: string; signature?: string };
 
 export type ContentBlock = TextBlock | ReasoningBlock | ToolCallBlock;
 

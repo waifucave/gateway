@@ -1,6 +1,6 @@
 import { GatewayError } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
-import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, Usage } from "../client/types.js";
+import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, ToolCallBlock, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
 import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
@@ -81,7 +81,14 @@ function encodeContents(
         if (block.type === "text") return { text: block.text };
         if (block.type === "toolCall") {
           toolNameById.set(block.id, block.name);
-          return { functionCall: { name: block.name, args: parseArguments(model.providerId, block.name, block.arguments) } };
+          // Gemini 3 hard-rejects history functionCall parts without a thoughtSignature
+          // (HTTP 400, observed live 2026-07-02). Round-trip the real signature when one
+          // was captured at decode; for synthetic/injected calls use Google's documented
+          // bypass value for exactly this case.
+          return {
+            functionCall: { name: block.name, args: parseArguments(model.providerId, block.name, block.arguments) },
+            thoughtSignature: block.signature ?? GOOGLE_INJECTED_CALL_SIGNATURE
+          };
         }
         // Reasoning is re-encoded unconditionally (not gated on features.reasoningRoundTrip,
         // unlike openai-chat): Gemini 3 requires thoughtSignature round-trip on tool loops,
@@ -136,15 +143,15 @@ function decodeParts(parts: GooglePart[], toolStartIndex: number): { blocks: Con
   let toolCount = 0;
   for (const part of parts) {
     if (part.functionCall) {
-      // LOSSY: a thoughtSignature carried on a functionCall part is dropped —
-      // ToolCallBlock has no signature field. Revisit if Gemini 3 tool loops
-      // need it round-tripped (tracked for the app-integration phase).
-      blocks.push({
-        type: "toolCall",
-        id: part.functionCall.id ?? `call_${toolStartIndex + toolCount}`,
-        name: part.functionCall.name ?? "",
-        arguments: JSON.stringify(part.functionCall.args ?? {})
-      });
+      blocks.push(
+        pruneUndefined({
+          type: "toolCall",
+          id: part.functionCall.id ?? `call_${toolStartIndex + toolCount}`,
+          name: part.functionCall.name ?? "",
+          arguments: JSON.stringify(part.functionCall.args ?? {}),
+          signature: part.thoughtSignature
+        }) as ToolCallBlock
+      );
       toolCount++;
     } else if (part.thought === true) {
       blocks.push(
@@ -259,6 +266,10 @@ export const googleGenerativeLanguageCodec: Codec = { wire: "google-generative-l
 // HTTP 400 "Unknown name ... Cannot find field" (observed live 2026-07-02 for
 // `additionalProperties`; validation tightened server-side vs the 2026-06 smoke). Keep only
 // proto-known fields and recurse through the nesting keywords.
+// Google's documented dummy signature for function calls the caller injected rather than
+// the model generated (Gemini 3 thought-signature validation).
+const GOOGLE_INJECTED_CALL_SIGNATURE = "context_engineering_is_the_way_to_go";
+
 const GOOGLE_SCHEMA_FIELDS = new Set([
   "type",
   "format",
