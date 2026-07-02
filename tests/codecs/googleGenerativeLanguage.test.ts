@@ -279,3 +279,53 @@ describe("google decodeStream", () => {
     await expect(collect(googleGenerativeLanguageCodec.decodeStream(model, sse([{ data: "{bad" }])))).rejects.toThrow(GatewayError);
   });
 });
+
+describe("google tool schema sanitization", () => {
+  it("strips fields outside Google's Schema proto recursively", () => {
+    const encoded = goldenEncode({
+      messages: [{ role: "user", content: "q" }],
+      tools: [
+        {
+          name: "orchestrator_decision",
+          description: "d",
+          parameters: {
+            type: "object",
+            additionalProperties: false,
+            $schema: "https://json-schema.org/draft/2020-12/schema",
+            properties: {
+              respondingWaifus: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    directive: {
+                      anyOf: [
+                        { type: "object", additionalProperties: false, properties: { goal: { type: "string", maxLength: 100 } }, required: ["goal"] },
+                        { type: "null" }
+                      ]
+                    }
+                  },
+                  required: ["waifuId"]
+                }
+              }
+            },
+            required: ["action"]
+          }
+        }
+      ]
+    });
+    const declaration = (encoded.body.tools as Array<{ functionDeclarations: Array<{ parameters: Record<string, unknown> }> }>)[0]
+      .functionDeclarations[0];
+    const params = declaration.parameters;
+    expect(params.additionalProperties).toBeUndefined();
+    expect(params.$schema).toBeUndefined();
+    expect(params.required).toEqual(["action"]);
+    const items = (params.properties as any).respondingWaifus.items;
+    expect(items.additionalProperties).toBeUndefined();
+    expect(items.required).toEqual(["waifuId"]);
+    const objectBranch = items.properties.directive.anyOf[0];
+    expect(objectBranch.additionalProperties).toBeUndefined();
+    expect(objectBranch.properties.goal.maxLength).toBe(100);
+  });
+});

@@ -105,7 +105,11 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     body.tools = [
       {
         functionDeclarations: request.tools.map((tool) =>
-          pruneUndefined({ name: tool.name, description: tool.description, parameters: tool.parameters })
+          pruneUndefined({
+            name: tool.name,
+            description: tool.description,
+            parameters: sanitizeGoogleSchema(tool.parameters)
+          })
         )
       }
     ];
@@ -250,3 +254,53 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
 }
 
 export const googleGenerativeLanguageCodec: Codec = { wire: "google-generative-language", encode, decodeResponse, decodeStream };
+
+// Google's function-declaration validator rejects ANY field outside its Schema proto with
+// HTTP 400 "Unknown name ... Cannot find field" (observed live 2026-07-02 for
+// `additionalProperties`; validation tightened server-side vs the 2026-06 smoke). Keep only
+// proto-known fields and recurse through the nesting keywords.
+const GOOGLE_SCHEMA_FIELDS = new Set([
+  "type",
+  "format",
+  "title",
+  "description",
+  "nullable",
+  "enum",
+  "items",
+  "properties",
+  "required",
+  "anyOf",
+  "default",
+  "example",
+  "minimum",
+  "maximum",
+  "minItems",
+  "maxItems",
+  "minLength",
+  "maxLength",
+  "minProperties",
+  "maxProperties",
+  "pattern",
+  "propertyOrdering"
+]);
+
+function sanitizeGoogleSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map((entry) => sanitizeGoogleSchema(entry));
+  if (schema === null || typeof schema !== "object") return schema;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
+    if (!GOOGLE_SCHEMA_FIELDS.has(key)) continue;
+    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+      const props: Record<string, unknown> = {};
+      for (const [name, sub] of Object.entries(value as Record<string, unknown>)) {
+        props[name] = sanitizeGoogleSchema(sub);
+      }
+      out[key] = props;
+    } else if (key === "items" || key === "anyOf") {
+      out[key] = sanitizeGoogleSchema(value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
