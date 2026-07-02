@@ -82,9 +82,22 @@ type ParsedBody = { ok: true; body: Record<string, unknown> } | { ok: false; res
  */
 const CHAT_ROLES = new Set(["system", "user", "assistant", "tool"]);
 
-function validateContentBlock(block: unknown, messageIndex: number, blockIndex: number): string | undefined {
+/** Mirrors the ChatMessage union in client/types.ts: user/assistant content arrays allow different block types. */
+const CONTENT_BLOCK_TYPES = new Set(["text", "image", "reasoning", "toolCall"]);
+const CONTENT_BLOCK_TYPES_BY_ROLE: Record<"user" | "assistant", Set<string>> = {
+  user: new Set(["text", "image"]),
+  assistant: new Set(["text", "reasoning", "toolCall"])
+};
+
+function validateContentBlock(block: unknown, messageIndex: number, blockIndex: number, role: "user" | "assistant"): string | undefined {
   const prefix = `messages[${messageIndex}].content[${blockIndex}]`;
   if (!isPlainObject(block)) return `${prefix} must be an object`;
+  if (!CONTENT_BLOCK_TYPES.has(block.type as string)) {
+    return `${prefix}: unknown content block type ${JSON.stringify(block.type)}`;
+  }
+  if (!CONTENT_BLOCK_TYPES_BY_ROLE[role].has(block.type as string)) {
+    return `${prefix}: block type ${JSON.stringify(block.type)} not allowed in ${role} messages`;
+  }
   switch (block.type) {
     case "text":
       return typeof block.text === "string" ? undefined : `${prefix}: text block requires a string "text"`;
@@ -93,14 +106,18 @@ function validateContentBlock(block: unknown, messageIndex: number, blockIndex: 
         ? undefined
         : `${prefix}: image block requires "mimeType" and "data" strings`;
     case "reasoning":
-      return typeof block.text === "string" ? undefined : `${prefix}: reasoning block requires a string "text"`;
+      if (typeof block.text !== "string") return `${prefix}: reasoning block requires a string "text"`;
+      if (block.signature !== undefined && typeof block.signature !== "string") return `${prefix}: reasoning block "signature" must be a string`;
+      if (block.redacted !== undefined && typeof block.redacted !== "boolean") return `${prefix}: reasoning block "redacted" must be a boolean`;
+      if (block.data !== undefined && typeof block.data !== "string") return `${prefix}: reasoning block "data" must be a string`;
+      return undefined;
     case "toolCall":
       if (typeof block.id !== "string" || block.id === "") return `${prefix}: toolCall block requires an "id"`;
       if (typeof block.name !== "string" || block.name === "") return `${prefix}: toolCall block requires a "name"`;
       if (typeof block.arguments !== "string") return `${prefix}: toolCall block requires "arguments"`;
       return undefined;
     default:
-      return `${prefix}: unknown content block type ${JSON.stringify(block.type)}`;
+      return undefined; // unreachable: type is checked against CONTENT_BLOCK_TYPES above
   }
 }
 
@@ -123,8 +140,9 @@ function validateChatMessages(messages: unknown[]): string | undefined {
     // user / assistant: content is a string or an array of content blocks
     if (typeof message.content === "string") continue;
     if (!Array.isArray(message.content)) return `messages[${i}]: "content" must be a string or an array`;
+    const role = message.role as "user" | "assistant";
     for (let j = 0; j < message.content.length; j++) {
-      const error = validateContentBlock(message.content[j], i, j);
+      const error = validateContentBlock(message.content[j], i, j, role);
       if (error) return error;
     }
   }

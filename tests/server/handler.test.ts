@@ -462,6 +462,39 @@ describe("POST /v1/chat element validation (P1c carryover)", () => {
     expect(body.error.message).toBe('messages[0].content[0]: text block requires a string "text"');
   });
 
+  it("400s a user message with a toolCall content block, naming the disallowed role", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: [{ type: "toolCall", id: "call_1", name: "lookup", arguments: "{}" }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: block type "toolCall" not allowed in user messages');
+  });
+
+  it("400s an assistant message with an image content block, naming the disallowed role", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "assistant", content: [{ type: "image", mimeType: "image/png", data: "abc123" }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: block type "image" not allowed in assistant messages');
+  });
+
+  it("400s a reasoning content block with a non-string signature", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "assistant", content: [{ type: "reasoning", text: "hm", signature: 123 }] }]
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('messages[0].content[0]: reasoning block "signature" must be a string');
+  });
+
   it("400s a tool-role message missing toolCallId", async () => {
     const response = await chat({
       provider: "deepseek",
@@ -518,6 +551,44 @@ describe("POST /v1/chat element validation (P1c carryover)", () => {
         { role: "user", content: [{ type: "text", text: "hi" }] },
         { role: "assistant", content: [{ type: "toolCall", id: "call_1", name: "lookup", arguments: "{}" }] },
         { role: "tool", toolCallId: "call_1", content: "42" }
+      ],
+      params: { "reasoning.enabled": false }
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("still reaches the codec for a user message with text+image content (control)", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "hi" },
+            { type: "image", mimeType: "image/png", data: "abc123" }
+          ]
+        }
+      ],
+      params: { "reasoning.enabled": false }
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("still reaches the codec for an assistant message with text+reasoning+toolCall content (control)", async () => {
+    const response = await chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "let me check" },
+            { type: "reasoning", text: "thinking..." },
+            { type: "toolCall", id: "call_1", name: "lookup", arguments: "{}" }
+          ]
+        }
       ],
       params: { "reasoning.enabled": false }
     });
