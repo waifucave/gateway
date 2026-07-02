@@ -105,7 +105,7 @@ describe("google encode — contents & tools", () => {
     const encoded = goldenEncode({ messages, tools: [{ name: "lookup", description: "d", parameters: { type: "object" } }] });
     expect(encoded.body.contents).toEqual([
       { role: "user", parts: [{ text: "q" }] },
-      { role: "model", parts: [{ functionCall: { name: "lookup", args: { q: "x" } } }] },
+      { role: "model", parts: [{ functionCall: { name: "lookup", args: { q: "x" } }, thoughtSignature: "context_engineering_is_the_way_to_go" }] },
       { role: "user", parts: [{ functionResponse: { name: "lookup", response: { answer: 42 } } }] }
     ]);
     expect(encoded.body.tools).toEqual([{ functionDeclarations: [{ name: "lookup", description: "d", parameters: { type: "object" } }] }]);
@@ -226,13 +226,13 @@ describe("google decodeResponse", () => {
     expect(() => googleGenerativeLanguageCodec.decodeResponse(model, { promptFeedback: {} })).toThrow(GatewayError);
   });
 
-  it("PINNED LIMITATION: a thoughtSignature on a functionCall part is dropped (ToolCallBlock has no signature field)", () => {
+  it("captures a thoughtSignature on a functionCall part into the toolCall block", () => {
     const response = googleGenerativeLanguageCodec.decodeResponse(model, {
       candidates: [
         { content: { parts: [{ functionCall: { name: "lookup", args: {} }, thoughtSignature: "SIG_ON_FC" }] }, finishReason: "STOP" }
       ]
     });
-    expect(response.content).toEqual([{ type: "toolCall", id: "call_0", name: "lookup", arguments: "{}" }]);
+    expect(response.content).toEqual([{ type: "toolCall", id: "call_0", name: "lookup", arguments: "{}", signature: "SIG_ON_FC" }]);
   });
 });
 
@@ -327,5 +327,29 @@ describe("google tool schema sanitization", () => {
     const objectBranch = items.properties.directive.anyOf[0];
     expect(objectBranch.additionalProperties).toBeUndefined();
     expect(objectBranch.properties.goal.maxLength).toBe(100);
+  });
+});
+
+describe("google thought signatures on function calls", () => {
+  it("attaches the documented injected-call signature to synthetic toolCall history", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "q" },
+      { role: "assistant", content: [{ type: "toolCall", id: "call_0", name: "lookup", arguments: '{"q":"x"}' }] },
+      { role: "tool", toolCallId: "call_0", content: '{"answer":42}' }
+    ];
+    const encoded = goldenEncode({ messages, tools: [{ name: "lookup", description: "d", parameters: { type: "object" } }] });
+    const modelTurn = (encoded.body.contents as Array<{ role: string; parts: Array<Record<string, unknown>> }>)[1];
+    expect(modelTurn.parts[0].thoughtSignature).toBe("context_engineering_is_the_way_to_go");
+  });
+
+  it("round-trips a real thoughtSignature captured at decode", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "q" },
+      { role: "assistant", content: [{ type: "toolCall", id: "call_0", name: "lookup", arguments: "{}", signature: "sig-abc" }] },
+      { role: "tool", toolCallId: "call_0", content: "{}" }
+    ];
+    const encoded = goldenEncode({ messages, tools: [{ name: "lookup", description: "d", parameters: { type: "object" } }] });
+    const modelTurn = (encoded.body.contents as Array<{ role: string; parts: Array<Record<string, unknown>> }>)[1];
+    expect(modelTurn.parts[0].thoughtSignature).toBe("sig-abc");
   });
 });
