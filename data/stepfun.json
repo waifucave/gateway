@@ -23,7 +23,7 @@
           "contextTokens": 262144,
           "maxOutputTokens": 16384,
           "pricing": {
-            "inputPerMTok": 0.09,
+            "inputPerMTok": 0.1,
             "outputPerMTok": 0.3,
             "cachedInputPerMTok": 0.02
           },

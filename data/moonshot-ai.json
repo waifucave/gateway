@@ -22,8 +22,8 @@
           "contextTokens": 262144,
           "maxOutputTokens": 262144,
           "pricing": {
-            "inputPerMTok": 0.4,
-            "outputPerMTok": 1.9,
+            "inputPerMTok": 0.375,
+            "outputPerMTok": 2.025,
             "cachedInputPerMTok": 0.09
           },
           "modalities": [
@@ -226,8 +226,8 @@
           "contextTokens": 262144,
           "maxOutputTokens": 262142,
           "pricing": {
-            "inputPerMTok": 0.68,
-            "outputPerMTok": 3.41,
+            "inputPerMTok": 0.55,
+            "outputPerMTok": 3.2,
             "cachedInputPerMTok": 0.34
           },
           "modalities": [

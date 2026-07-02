@@ -122,7 +122,11 @@ describe("gatewayPlugin", () => {
     await app.register(gatewayPluginDefault);
     const response = await app.inject({ method: "GET", url: "/v1/models" });
     expect(response.statusCode).toBe(200);
-    expect((response.json() as { models: unknown[] }).models).toHaveLength(100);
+    // 100 → 98 on 2026-07-02: openrouter/owl-alpha (whole family, gone from
+    // OpenRouter's live /models list) and openrouter:xiaomi/mimo-v2-flash
+    // (gone from the live list; the xiaomi-native route for the same family
+    // stays) were both dropped as stale routes.
+    expect((response.json() as { models: unknown[] }).models).toHaveLength(98);
   });
 });
 

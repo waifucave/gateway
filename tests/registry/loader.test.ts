@@ -5,9 +5,12 @@ import { Registry } from "../../src/registry/loader.js";
 const registry = Registry.load();
 
 describe("Registry", () => {
-  it("loads 54 families and flattens all routes", () => {
-    expect(registry.listFamilies()).toHaveLength(54);
-    expect(registry.listModels().length).toBeGreaterThan(54);
+  it("loads 53 families and flattens all routes", () => {
+    // openrouter/owl-alpha dropped 2026-07-02: gone from OpenRouter's public
+    // /models list (no "owl"/"alpha" id anywhere in the live catalog) and it
+    // had no other route, so the whole family was removed.
+    expect(registry.listFamilies()).toHaveLength(53);
+    expect(registry.listModels().length).toBeGreaterThan(53);
   });
 
   it("resolves a native route with provider-table base URL fallback", () => {
@@ -19,19 +22,26 @@ describe("Registry", () => {
     expect(model!.constraints.map((c) => c.id)).toContain("thinking-no-forced-tools");
   });
 
-  it("applies route overrides for limits and pricing (owl alpha)", () => {
-    const model = registry.resolve("openrouter", "openrouter/owl-alpha");
+  it("applies route overrides for limits and pricing (z-ai glm-4.5-air)", () => {
+    // replaces the former openrouter/owl-alpha case (route deleted 2026-07-02,
+    // model gone from OpenRouter's live /models list); glm-4.5-air's openrouter
+    // route overrides contextTokens/maxOutputTokens away from the doc-level
+    // base (128000/96000), so it still exercises real override behavior.
+    const model = registry.resolve("openrouter", "z-ai/glm-4.5-air");
     expect(model).toBeDefined();
-    expect(model!.limits.contextTokens).toBe(1048756);
-    expect(model!.limits.maxOutputTokens).toBe(262144);
+    expect(model!.limits.contextTokens).toBe(131072);
+    expect(model!.limits.maxOutputTokens).toBe(131070);
+    // pricing synced to OpenRouter's live /models list on 2026-07-02
+    expect(model!.meta.pricing?.inputPerMTok).toBe(0.13);
+    expect(model!.meta.pricing?.outputPerMTok).toBe(0.85);
   });
 
   it("filters params on OpenRouter routes via supportedParameters", () => {
-    const model = registry.resolve("openrouter", "openrouter/owl-alpha");
-    // owl-alpha's supportedParameters has no min_p/top_a/verbosity-style extras;
-    // every surviving canonical param must map back into the supported list
+    const model = registry.resolve("openrouter", "z-ai/glm-4.5-air");
+    // glm-4.5-air's supportedParameters has no min_p/logit_bias/top_a/verbosity-style
+    // extras; every surviving canonical param must map back into the supported list
     const supported = new Set([
-      "frequencyPenalty", "logitBias", "maxOutputTokens", "presencePenalty",
+      "frequencyPenalty", "maxOutputTokens", "presencePenalty",
       "repetitionPenalty", "seed", "stopSequences", "temperature", "topK", "topP"
     ]);
     for (const name of Object.keys(model!.params)) {
