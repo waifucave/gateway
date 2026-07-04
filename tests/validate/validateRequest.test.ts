@@ -12,6 +12,30 @@ describe("validateRequest", () => {
     expect(result.violations.some((v) => v.code === "forbidden_value" && v.param === "toolChoice")).toBe(true);
   });
 
+  it("rejects forced tool choice when Anthropic thinking is enabled (live 400 on Beta 2026-07-03)", () => {
+    // Anthropic docs: tool use with extended thinking only supports tool_choice auto/none;
+    // any/tool return HTTP 400 "Thinking may not be enabled when tool_choice forces tool use."
+    // Applies to every model with manual (budget_tokens) thinking — our codec's only mode.
+    for (const modelId of ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7"]) {
+      const model = registry.resolve("anthropic", modelId)!;
+      const result = validateRequest(model, { params: { "reasoning.enabled": true }, toolChoice: "required" });
+      expect(result.ok, modelId).toBe(false);
+      expect(
+        result.violations.some((v) => v.code === "forbidden_value" && v.param === "toolChoice"),
+        modelId
+      ).toBe(true);
+      const named = validateRequest(model, { params: { "reasoning.enabled": true }, toolChoice: { name: "x" } });
+      expect(named.ok, modelId).toBe(false);
+    }
+  });
+
+  it("Anthropic forced tool choice passes with thinking off", () => {
+    const model = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+    expect(validateRequest(model, { params: { "reasoning.enabled": false }, toolChoice: "required" }).ok).toBe(true);
+    expect(validateRequest(model, { params: {}, toolChoice: "required" }).ok).toBe(true);
+    expect(validateRequest(model, { params: { "reasoning.enabled": true }, toolChoice: "auto" }).ok).toBe(true);
+  });
+
   it("DeepSeek thinking defaults ON, so forced tool choice fails even without explicit reasoning param", () => {
     const model = registry.resolve("deepseek", "deepseek-v4-flash")!;
     const result = validateRequest(model, { params: {}, toolChoice: "required" });

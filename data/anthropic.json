@@ -141,6 +141,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -305,6 +319,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -471,6 +499,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -637,6 +679,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -799,6 +855,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -962,6 +1032,20 @@
           }
         },
         "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+      },
+      {
+        "id": "thinking-no-forced-tools",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:required",
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
