@@ -113,7 +113,8 @@ export const CapabilityDocSchema = z
         assistantPrefill: z.boolean().optional(),
         systemRole: z.enum(["system", "developer", "top-level", "systemInstruction"]),
         multipleSystemMessages: z.boolean().optional(),
-        reasoningRoundTrip: z.boolean().optional()
+        reasoningRoundTrip: z.boolean().optional(),
+        thinkingStyle: z.enum(["budget", "adaptive", "always-on"]).optional()
       })
       .strict(),
     params: z.record(z.string(), ParamDescriptorSchema),

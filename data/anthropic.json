@@ -88,7 +88,8 @@
       "assistantPrefill": true,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "budget"
     },
     "params": {
       "maxOutputTokens": {
@@ -154,7 +155,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -266,7 +267,8 @@
       "assistantPrefill": true,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "budget"
     },
     "params": {
       "maxOutputTokens": {
@@ -332,7 +334,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -446,7 +448,8 @@
       "assistantPrefill": false,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "adaptive"
     },
     "params": {
       "maxOutputTokens": {
@@ -512,7 +515,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -626,7 +629,8 @@
       "assistantPrefill": false,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "adaptive"
     },
     "params": {
       "maxOutputTokens": {
@@ -692,7 +696,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -802,7 +806,8 @@
       "assistantPrefill": false,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "adaptive"
     },
     "params": {
       "maxOutputTokens": {
@@ -868,7 +873,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {
@@ -979,7 +984,8 @@
       "assistantPrefill": false,
       "systemRole": "top-level",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": true,
+      "thinkingStyle": "always-on"
     },
     "params": {
       "maxOutputTokens": {
@@ -1045,7 +1051,7 @@
             "toolChoice:named"
           ]
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking \u2014 tool use with thinking only supports tool_choice auto/none; live 400 on claude-haiku-4-5-20251001 2026-07-03: \"Thinking may not be enabled when tool_choice forces tool use.\""
       }
     ],
     "meta": {

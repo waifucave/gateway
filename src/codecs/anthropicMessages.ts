@@ -97,10 +97,26 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
   if (typeof body.max_tokens !== "number") body.max_tokens = defaultMaxTokens(model);
   const thinking = body.thinking as { type?: string; budget_tokens?: number } | undefined;
-  if (thinking) {
+  const thinkingStyle = model.features.thinkingStyle ?? "budget";
+  if (thinkingStyle === "always-on") {
+    // Fable-class models reject any explicit thinking config (enabled/budget/disabled all 400).
+    if (thinking && thinking.type !== "enabled") {
+      warnings.push({ code: "param_forced", param: "reasoning.enabled", message: "thinking is always on for this model and cannot be disabled" });
+    } else if (typeof thinking?.budget_tokens === "number") {
+      warnings.push({ code: "param_dropped", param: "reasoning.budgetTokens", message: "budget_tokens is not supported on this model; thinking is adaptive and always on" });
+    }
+    delete body.thinking;
+  } else if (thinking) {
     if (thinking.type === "enabled") {
-      if (typeof thinking.budget_tokens !== "number") thinking.budget_tokens = DEFAULT_THINKING_BUDGET;
-      if ((body.max_tokens as number) <= thinking.budget_tokens) body.max_tokens = thinking.budget_tokens + DEFAULT_THINKING_BUDGET;
+      if (thinkingStyle === "adaptive") {
+        if (typeof thinking.budget_tokens === "number") {
+          warnings.push({ code: "param_dropped", param: "reasoning.budgetTokens", message: "budget_tokens is rejected by this model; using adaptive thinking instead" });
+        }
+        body.thinking = { type: "adaptive" };
+      } else {
+        if (typeof thinking.budget_tokens !== "number") thinking.budget_tokens = DEFAULT_THINKING_BUDGET;
+        if ((body.max_tokens as number) <= thinking.budget_tokens) body.max_tokens = thinking.budget_tokens + DEFAULT_THINKING_BUDGET;
+      }
     } else {
       body.thinking = { type: "disabled" };
     }

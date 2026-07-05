@@ -7,7 +7,8 @@ import type { ChatMessage, StreamEvent } from "../../src/client/types.js";
 import type { SseEvent } from "../../src/transport/sse.js";
 
 const registry = Registry.load();
-const model = registry.resolve("anthropic", "claude-fable-5")!;
+// budget-style family: the legacy thinking goldens below assert budget_tokens behavior
+const model = registry.resolve("anthropic", "claude-sonnet-4-5-20250929")!;
 
 function goldenEncode(input: {
   params?: Record<string, unknown>;
@@ -45,6 +46,49 @@ async function collect(iter: AsyncIterable<StreamEvent>): Promise<StreamEvent[]>
   return out;
 }
 
+describe("anthropic-messages encode — thinking styles per family", () => {
+  const budgetModel = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+  const adaptiveModel = registry.resolve("anthropic", "claude-opus-4-6")!;
+  const alwaysOnModel = registry.resolve("anthropic", "claude-fable-5")!;
+
+  function encodeFor(m: typeof model, params: Record<string, unknown>) {
+    const validation = validateRequest(m, { params, stream: false });
+    expect(validation.ok, JSON.stringify(validation.violations)).toBe(true);
+    return anthropicMessagesCodec.encode(
+      m,
+      { messages: [{ role: "user", content: "hi" }], effectiveParams: validation.effectiveParams, stream: false },
+      "TEST_KEY"
+    );
+  }
+
+  it("budget style keeps {enabled, budget_tokens}", () => {
+    const encoded = encodeFor(budgetModel, { "reasoning.enabled": true, "reasoning.budgetTokens": 1500 });
+    expect(encoded.body.thinking).toEqual({ type: "enabled", budget_tokens: 1500 });
+  });
+
+  it("adaptive style emits {type:'adaptive'} and drops budget with a warning", () => {
+    const encoded = encodeFor(adaptiveModel, { "reasoning.enabled": true, "reasoning.budgetTokens": 1500 });
+    expect(encoded.body.thinking).toEqual({ type: "adaptive" });
+    expect(encoded.warnings.map((w) => w.message).join(" ")).toMatch(/budget/i);
+  });
+
+  it("adaptive style without budget emits {type:'adaptive'} cleanly", () => {
+    const encoded = encodeFor(adaptiveModel, { "reasoning.enabled": true });
+    expect(encoded.body.thinking).toEqual({ type: "adaptive" });
+  });
+
+  it("always-on style omits thinking entirely (fable rejects any explicit config)", () => {
+    const encoded = encodeFor(alwaysOnModel, { "reasoning.enabled": true });
+    expect(encoded.body.thinking).toBeUndefined();
+  });
+
+  it("always-on style warns that thinking cannot be disabled", () => {
+    const encoded = encodeFor(alwaysOnModel, { "reasoning.enabled": false });
+    expect(encoded.body.thinking).toBeUndefined();
+    expect(encoded.warnings.map((w) => w.message).join(" ")).toMatch(/always on|cannot be disabled/i);
+  });
+});
+
 describe("anthropic-messages encode — thinking payload", () => {
   it("GOLDEN: thinking payload with budget, top-level system, reasoningRoundTrip directive skipped", () => {
     const encoded = goldenEncode({
@@ -55,7 +99,7 @@ describe("anthropic-messages encode — thinking payload", () => {
       ]
     });
     expect(encoded.body).toEqual({
-      model: "claude-fable-5",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 2048,
       thinking: { type: "enabled", budget_tokens: 1500 },
       system: "Be terse.",
@@ -216,7 +260,7 @@ describe("anthropic-messages decodeResponse", () => {
     expect(response).toEqual({
       id: "msg_1",
       provider: "anthropic",
-      model: "claude-fable-5",
+      model: "claude-sonnet-4-5-20250929",
       content: [
         { type: "reasoning", text: "hmm", signature: "sig_1" },
         { type: "text", text: "calling" },
@@ -276,7 +320,7 @@ describe("anthropic-messages decodeStream", () => {
         response: {
           id: "msg_3",
           provider: "anthropic",
-          model: "claude-fable-5",
+          model: "claude-sonnet-4-5-20250929",
           content: [
             { type: "reasoning", text: "hm", signature: "sig_z" },
             { type: "text", text: "ok" },
@@ -307,7 +351,7 @@ describe("anthropic-messages decodeStream", () => {
       response: {
         id: "msg_t",
         provider: "anthropic",
-        model: "claude-fable-5",
+        model: "claude-sonnet-4-5-20250929",
         content: [{ type: "text", text: "par" }],
         finishReason: "error",
         usage: { inputTokens: 3, outputTokens: 0 },
