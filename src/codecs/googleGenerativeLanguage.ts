@@ -104,7 +104,17 @@ function encodeContents(
 function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): EncodedRequest {
   const mapped = mapNativeParams(model, request.effectiveParams);
   const warnings = [...mapped.warnings];
-  const body: Record<string, unknown> = { ...mapped.wire }; // model id lives in the URL, not the body
+  const body: Record<string, unknown> = { ...mapped.wire };
+  // Roleplay banter routinely trips default SAFETY thresholds; run with permissive settings.
+  // (Prompt-level blockReasons like PROHIBITED_CONTENT are not configurable and still surface as errors.)
+  if (body.safetySettings === undefined) {
+    body.safetySettings = [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+    ];
+  } // model id lives in the URL, not the body
   const { systemInstruction, contents } = encodeContents(model, request.messages);
   if (systemInstruction !== undefined) body.systemInstruction = systemInstruction;
   body.contents = contents;
@@ -180,6 +190,10 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
   // multi-candidate responses are not part of the unified API; only the first is surfaced
   const candidate = wire.candidates?.[0];
   if (!candidate) {
+    const blockReason = (wire as { promptFeedback?: { blockReason?: string } }).promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new GatewayError("server", `${model.providerId} blocked the prompt: ${blockReason}`, { provider: model.providerId, raw: payload });
+    }
     throw new GatewayError("server", `${model.providerId} response has no candidates`, { provider: model.providerId, raw: payload });
   }
   const { blocks, toolCount } = decodeParts(candidate.content?.parts ?? [], 0);
