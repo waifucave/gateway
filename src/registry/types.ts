@@ -93,6 +93,8 @@ export type Features = {
   systemRole: "system" | "developer" | "top-level" | "systemInstruction";
   multipleSystemMessages?: boolean;
   reasoningRoundTrip?: boolean;
+  /** How the anthropic wire expresses extended thinking: legacy budget_tokens, 4.6+ adaptive, or fable-style always-on (no thinking field allowed). */
+  thinkingStyle?: "budget" | "adaptive" | "always-on";
 };
 
 export type CapabilityDoc = {
