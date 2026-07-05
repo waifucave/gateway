@@ -353,3 +353,27 @@ describe("google thought signatures on function calls", () => {
     expect(modelTurn.parts[0].thoughtSignature).toBe("sig-abc");
   });
 });
+
+describe("google safety handling", () => {
+  const gmodel = registry.resolve("google-ai-studio", "gemini-3.1-flash-lite") ?? registry.resolve("google-ai-studio", "gemini-3-flash")!;
+
+  it("surfaces the blockReason when the prompt is blocked (empty candidates)", () => {
+    expect(() =>
+      googleGenerativeLanguageCodec.decodeResponse(gmodel, {
+        promptFeedback: { blockReason: "PROHIBITED_CONTENT" },
+        usageMetadata: { promptTokenCount: 5311 }
+      })
+    ).toThrowError(/blocked.*PROHIBITED_CONTENT/i);
+  });
+
+  it("encodes permissive safetySettings on every request", () => {
+    const encoded = googleGenerativeLanguageCodec.encode(
+      gmodel,
+      { messages: [{ role: "user", content: "hi" }], effectiveParams: {}, stream: false },
+      "TEST_KEY"
+    );
+    const settings = (encoded.body as Record<string, unknown>).safetySettings as Array<{ category: string; threshold: string }>;
+    expect(settings?.length).toBeGreaterThanOrEqual(4);
+    expect(settings.every((s) => s.threshold === "BLOCK_NONE")).toBe(true);
+  });
+});
