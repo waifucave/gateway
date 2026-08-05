@@ -1,21 +1,21 @@
 [
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "trinity-large-thinking",
-    "displayName": "Trinity Large Thinking",
-    "company": "Arcee AI",
+    "family": "hy3",
+    "displayName": "Hy3",
+    "company": "Tencent",
     "routes": [
       {
         "providerId": "openrouter",
-        "modelId": "arcee-ai/trinity-large-thinking",
+        "modelId": "tencent/hy3",
         "wire": "openai-chat",
         "overrides": {
           "contextTokens": 262144,
-          "maxOutputTokens": 262144,
+          "maxOutputTokens": 128000,
           "pricing": {
-            "inputPerMTok": 0.22,
-            "outputPerMTok": 0.85,
-            "cachedInputPerMTok": 0.06
+            "inputPerMTok": 0.132,
+            "outputPerMTok": 0.528,
+            "cachedInputPerMTok": 0.033
           },
           "modalities": [
             "text"
@@ -24,10 +24,12 @@
             "frequency_penalty",
             "include_reasoning",
             "logit_bias",
-            "logprobs",
+            "max_completion_tokens",
             "max_tokens",
+            "min_p",
             "presence_penalty",
             "reasoning",
+            "reasoning_effort",
             "repetition_penalty",
             "response_format",
             "seed",
@@ -37,18 +39,16 @@
             "tool_choice",
             "tools",
             "top_k",
-            "top_logprobs",
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models",
-          "note": "Reasoning model: pass returned reasoning_details back unchanged on assistant messages; dropping them loses reasoning state."
+          "source": "https://openrouter.ai/api/v1/models"
         }
       }
     ],
     "limits": {
       "contextTokens": 262144,
-      "maxOutputTokens": 262144
+      "maxOutputTokens": 128000
     },
     "modalities": {
       "input": [
@@ -69,8 +69,8 @@
         "strict": false
       },
       "structuredOutput": {
-        "jsonMode": false,
-        "jsonSchema": false,
+        "jsonMode": true,
+        "jsonSchema": true,
         "strict": false
       },
       "promptCaching": {
@@ -79,52 +79,75 @@
       "assistantPrefill": false,
       "systemRole": "system",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": false
     },
     "params": {
       "temperature": {
         "type": "number",
         "wireName": "temperature",
-        "confidence": "verified",
-        "default": 0.3
+        "confidence": "unverified"
       },
       "topP": {
         "type": "number",
         "wireName": "top_p",
-        "confidence": "verified",
-        "default": 0.8
+        "confidence": "unverified"
       },
       "maxOutputTokens": {
         "type": "int",
         "wireName": "max_tokens",
-        "confidence": "verified",
-        "max": 262144
+        "confidence": "unverified"
       },
       "stopSequences": {
         "type": "string[]",
         "wireName": "stop",
-        "confidence": "verified"
+        "confidence": "unverified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "unverified"
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "unverified",
+        "values": [
+          "text",
+          "json_object",
+          "json_schema"
+        ]
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning.effort",
+        "confidence": "unverified",
+        "values": [
+          "none",
+          "low",
+          "high"
+        ]
       }
     },
     "constraints": [],
     "meta": {
       "pricing": {
-        "inputPerMTok": 0.25,
-        "outputPerMTok": 0.8
+        "inputPerMTok": 0.132,
+        "outputPerMTok": 0.528,
+        "cachedInputPerMTok": 0.033
       },
-      "knowledgeCutoff": "2024",
       "deprecated": false,
-      "availability": "OpenRouter-only; the gateway has no Arcee provider entry. Distinct 2026-04-01 successor to the retired trinity-large family, whose OpenRouter slug arcee-ai/trinity-large was quietly delisted.",
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
       "sources": [
-        "https://www.arcee.ai/blog/trinity-large-thinking",
-        "https://docs.arcee.ai/get-started/models-overview.md",
-        "https://docs.arcee.ai/language-models/trinity-large-thinking.md",
-        "https://docs.arcee.ai/capabilities/reasoning-traces.md",
-        "https://docs.arcee.ai/get-started/pricing.md",
-        "https://openrouter.ai/api/v1/models"
+        "https://openrouter.ai/api/v1/models",
+        "https://www.tencent.com/tencent-hunyuan-officially-releases-hy3-advancing-agent-capabilities-and-deeper-product-integration/"
       ],
       "verifiedAt": "2026-08-05",
-      "confidence": "verified"
+      "confidence": "partial"
     }
   }
 ]

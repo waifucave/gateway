@@ -1,33 +1,181 @@
 [
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "nemotron-3-super",
-    "displayName": "Nemotron 3 Super",
-    "company": "NVIDIA",
+    "family": "inkling",
+    "displayName": "Inkling",
+    "company": "Thinking Machines Lab",
     "routes": [
       {
-        "providerId": "nvidia",
-        "modelId": "nvidia/nemotron-3-super-120b-a12b",
-        "wire": "openai-chat",
-        "overrides": {
-          "baseUrl": "https://integrate.api.nvidia.com/v1",
-          "endpoint": "/chat/completions"
-        }
-      },
-      {
         "providerId": "openrouter",
-        "modelId": "nvidia/nemotron-3-super-120b-a12b",
+        "modelId": "thinkingmachines/inkling",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 1000000,
+          "contextTokens": 1048576,
           "maxOutputTokens": null,
           "pricing": {
-            "inputPerMTok": 0.085,
-            "outputPerMTok": 0.4,
-            "cachedInputPerMTok": null
+            "inputPerMTok": 1.0,
+            "outputPerMTok": 4.05,
+            "cachedInputPerMTok": 0.17
           },
           "modalities": [
-            "text"
+            "text",
+            "image",
+            "audio"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "audio"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "unverified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "unverified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified"
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "unverified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "unverified"
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "unverified",
+        "values": [
+          "text",
+          "json_object"
+        ]
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning.effort",
+        "confidence": "unverified",
+        "values": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.0,
+        "outputPerMTok": 4.05,
+        "cachedInputPerMTok": 0.17
+      },
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://thinkingmachines.ai/model-card/inkling/"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "inkling-small",
+    "displayName": "Inkling Small",
+    "company": "Thinking Machines Lab",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "thinkingmachines/inkling-small",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 524288,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 0.5,
+            "outputPerMTok": 1.2,
+            "cachedInputPerMTok": 0.1
+          },
+          "modalities": [
+            "text",
+            "image",
+            "audio"
           ],
           "supportedParameters": [
             "frequency_penalty",
@@ -38,8 +186,8 @@
             "min_p",
             "presence_penalty",
             "reasoning",
+            "reasoning_effort",
             "repetition_penalty",
-            "response_format",
             "seed",
             "stop",
             "temperature",
@@ -55,12 +203,14 @@
       }
     ],
     "limits": {
-      "contextTokens": 1000000,
-      "maxOutputTokens": 32768
+      "contextTokens": 524288,
+      "maxOutputTokens": 0
     },
     "modalities": {
       "input": [
-        "text"
+        "text",
+        "image",
+        "audio"
       ],
       "output": [
         "text"
@@ -71,9 +221,7 @@
       "streamingUsage": false,
       "tools": {
         "supported": true,
-        "toolChoice": [
-          "auto"
-        ],
+        "toolChoice": [],
         "parallel": false,
         "parallelDisable": false,
         "strict": false
@@ -84,7 +232,7 @@
         "strict": false
       },
       "promptCaching": {
-        "kind": "none"
+        "kind": "implicit"
       },
       "assistantPrefill": false,
       "systemRole": "system",
@@ -95,198 +243,44 @@
       "temperature": {
         "type": "number",
         "wireName": "temperature",
-        "confidence": "verified",
-        "max": 1,
-        "default": 1
+        "confidence": "unverified"
       },
       "topP": {
         "type": "number",
         "wireName": "top_p",
-        "confidence": "verified",
-        "max": 1,
-        "default": 0.95
+        "confidence": "unverified"
       },
       "maxOutputTokens": {
         "type": "int",
         "wireName": "max_tokens",
-        "confidence": "verified",
-        "max": 32768
+        "confidence": "unverified"
       },
       "stopSequences": {
         "type": "string[]",
         "wireName": "stop",
-        "confidence": "verified"
+        "confidence": "unverified"
       },
-      "reasoning.budgetTokens": {
+      "seed": {
         "type": "int",
-        "wireName": "reasoning_budget",
-        "confidence": "verified",
-        "min": -1,
-        "max": 32768,
-        "default": 16384
+        "wireName": "seed",
+        "confidence": "unverified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
       },
       "reasoning.effort": {
         "type": "enum",
-        "wireName": "reasoning_effort",
-        "confidence": "verified",
+        "wireName": "reasoning.effort",
+        "confidence": "unverified",
         "values": [
           "none",
+          "minimal",
           "low",
-          "high"
-        ]
-      }
-    },
-    "constraints": [],
-    "meta": {
-      "pricing": {
-        "inputPerMTok": 0.09,
-        "outputPerMTok": 0.45,
-        "cachedInputPerMTok": 0
-      },
-      "knowledgeCutoff": "",
-      "deprecated": false,
-      "sources": [
-        "https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b",
-        "https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b-infer",
-        "https://openrouter.ai/api/v1/models"
-      ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "verified"
-    }
-  },
-  {
-    "schema": "starlight.capability-doc.v1",
-    "family": "nemotron-3-ultra",
-    "displayName": "Nemotron 3 Ultra",
-    "company": "NVIDIA",
-    "routes": [
-      {
-        "providerId": "nvidia",
-        "modelId": "nvidia/nemotron-3-ultra-550b-a55b",
-        "wire": "openai-chat",
-        "overrides": {
-          "baseUrl": "https://integrate.api.nvidia.com/v1",
-          "endpoint": "/chat/completions"
-        }
-      },
-      {
-        "providerId": "openrouter",
-        "modelId": "nvidia/nemotron-3-ultra-550b-a55b",
-        "wire": "openai-chat",
-        "overrides": {
-          "contextTokens": 512288,
-          "maxOutputTokens": 16384,
-          "pricing": {
-            "inputPerMTok": 0.6,
-            "outputPerMTok": 3.6,
-            "cachedInputPerMTok": 0.2
-          },
-          "modalities": [
-            "text"
-          ],
-          "supportedParameters": [
-            "frequency_penalty",
-            "include_reasoning",
-            "logit_bias",
-            "max_tokens",
-            "min_p",
-            "presence_penalty",
-            "reasoning",
-            "repetition_penalty",
-            "response_format",
-            "seed",
-            "stop",
-            "structured_outputs",
-            "temperature",
-            "tool_choice",
-            "tools",
-            "top_k",
-            "top_p"
-          ],
-          "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
-        }
-      }
-    ],
-    "limits": {
-      "contextTokens": 1000000,
-      "maxOutputTokens": 32768
-    },
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    },
-    "features": {
-      "streaming": true,
-      "streamingUsage": false,
-      "tools": {
-        "supported": true,
-        "toolChoice": [
-          "auto"
-        ],
-        "parallel": false,
-        "parallelDisable": false,
-        "strict": false
-      },
-      "structuredOutput": {
-        "jsonMode": false,
-        "jsonSchema": false,
-        "strict": false
-      },
-      "promptCaching": {
-        "kind": "none"
-      },
-      "assistantPrefill": false,
-      "systemRole": "system",
-      "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
-    },
-    "params": {
-      "temperature": {
-        "type": "number",
-        "wireName": "temperature",
-        "confidence": "verified",
-        "max": 1,
-        "default": 1
-      },
-      "topP": {
-        "type": "number",
-        "wireName": "top_p",
-        "confidence": "verified",
-        "max": 1,
-        "default": 0.95
-      },
-      "maxOutputTokens": {
-        "type": "int",
-        "wireName": "max_tokens",
-        "confidence": "verified",
-        "max": 32768
-      },
-      "stopSequences": {
-        "type": "string[]",
-        "wireName": "stop",
-        "confidence": "verified"
-      },
-      "reasoning.budgetTokens": {
-        "type": "int",
-        "wireName": "reasoning_budget",
-        "confidence": "verified",
-        "min": -1,
-        "max": 32768,
-        "default": 16384
-      },
-      "reasoning.effort": {
-        "type": "enum",
-        "wireName": "reasoning_effort",
-        "confidence": "verified",
-        "values": [
-          "none",
           "medium",
-          "high"
+          "high",
+          "max"
         ]
       }
     },
@@ -294,18 +288,17 @@
     "meta": {
       "pricing": {
         "inputPerMTok": 0.5,
-        "outputPerMTok": 2.5,
-        "cachedInputPerMTok": 0.15
+        "outputPerMTok": 1.2,
+        "cachedInputPerMTok": 0.1
       },
-      "knowledgeCutoff": "",
       "deprecated": false,
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
       "sources": [
-        "https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b",
-        "https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-ultra-550b-a55b-infer",
-        "https://openrouter.ai/api/v1/models"
+        "https://openrouter.ai/api/v1/models",
+        "https://thinkingmachines.ai/model-card/inkling/"
       ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "verified"
+      "verifiedAt": "2026-08-05",
+      "confidence": "partial"
     }
   }
 ]

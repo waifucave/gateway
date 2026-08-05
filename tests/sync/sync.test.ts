@@ -174,7 +174,7 @@ describe("runSync", () => {
   });
 
   it("surfaces registry diagnostics as info findings that do not fail the check", async () => {
-    // the REAL registry has 14 unmapped-supportedParameters diagnostics; run sync
+    // the REAL registry has 49 unmapped-supportedParameters diagnostics; run sync
     // against it with no creds and a fake OpenRouter that contains every id
     const { Registry } = await import("../../src/registry/loader.js");
     const ids = Registry.load()
@@ -184,7 +184,7 @@ describe("runSync", () => {
     const fetchImpl = fakeFetch({ "openrouter.ai": () => ({ data: ids }) });
     const report = await runSync({ credentials: {}, fetchImpl, providers: ["openrouter"] });
     const infos = report.findings.filter((f) => f.level === "info" && f.field === "registry-diagnostic");
-    expect(infos).toHaveLength(14);
+    expect(infos).toHaveLength(49);
     // ids all match and pricing/context comparisons are skipped (no remote values in this fixture)
     expect(report.findings.filter((f) => f.level !== "info")).toEqual([]);
     expect(report.ok).toBe(true);

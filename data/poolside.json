@@ -1,0 +1,208 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "laguna-s-2-1",
+    "displayName": "Laguna S 2.1",
+    "company": "Poolside",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "poolside/laguna-s-2.1",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.18,
+            "cachedInputPerMTok": 0.009
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "temperature",
+            "tool_choice",
+            "tools"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 131072
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": false,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "unverified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.09,
+        "outputPerMTok": 0.18,
+        "cachedInputPerMTok": 0.009
+      },
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://poolside.ai/blog/introducing-laguna-s-2-1"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "laguna-xs-2-1",
+    "displayName": "Laguna XS 2.1",
+    "company": "Poolside",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "poolside/laguna-xs-2.1",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 262144,
+          "maxOutputTokens": 32768,
+          "pricing": {
+            "inputPerMTok": 0.06,
+            "outputPerMTok": 0.12,
+            "cachedInputPerMTok": 0.03
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "temperature",
+            "tool_choice",
+            "tools"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 262144,
+      "maxOutputTokens": 32768
+    },
+    "modalities": {
+      "input": [
+        "text"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": false,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "unverified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.06,
+        "outputPerMTok": 0.12,
+        "cachedInputPerMTok": 0.03
+      },
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://docs.poolside.ai/get-started/supported-models"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "partial"
+    }
+  }
+]

@@ -143,6 +143,17 @@
     "company": "Qwen",
     "routes": [
       {
+        "providerId": "qwen",
+        "modelId": "qwen3.6-max-preview",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "status": "deprecated",
+          "note": "Provider-announced direct-route decommission 2026-10-10 00:00; recommended replacement qwen3.7-max. Applies to this Singapore direct route only — the OpenRouter route stays live and does not inherit the EOL. Text-generation interface only (multimodal interface returns url error). Direct Singapore pricing is CNY per MTok (<=128K: 9.742 in / 58.455 out; >128K-256K: 14.988 / 89.93; explicit-cache create 12.178 / hit 0.974); implicit-cache applicability/price is conflicting/NOT FOUND, so USD meta pricing is omitted."
+        }
+      },
+      {
         "providerId": "openrouter",
         "modelId": "qwen/qwen3.6-max-preview",
         "wire": "openai-chat",
@@ -150,14 +161,15 @@
           "contextTokens": 262144,
           "maxOutputTokens": 65536,
           "pricing": {
-            "inputPerMTok": 1.04,
-            "outputPerMTok": 6.24,
+            "inputPerMTok": 1.027,
+            "outputPerMTok": 6.162,
             "cachedInputPerMTok": null
           },
           "modalities": [
             "text"
           ],
           "supportedParameters": [
+            "frequency_penalty",
             "include_reasoning",
             "logprobs",
             "max_tokens",
@@ -165,15 +177,18 @@
             "reasoning",
             "response_format",
             "seed",
+            "stop",
             "structured_outputs",
             "temperature",
             "tool_choice",
             "tools",
+            "top_k",
             "top_logprobs",
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Canonical slug qwen/qwen3.6-max-preview-20260420 (OpenRouter pin). Base-tier pricing; a live tier override raises it at 128,000 prompt tokens. Cache-read key omitted from the live pricing object."
         }
       }
     ],
@@ -191,28 +206,30 @@
     },
     "features": {
       "streaming": true,
-      "streamingUsage": false,
+      "streamingUsage": true,
       "tools": {
         "supported": true,
         "toolChoice": [
-          "auto"
+          "auto",
+          "none",
+          "named"
         ],
         "parallel": true,
-        "parallelDisable": false,
+        "parallelDisable": true,
         "strict": false
       },
       "structuredOutput": {
         "jsonMode": true,
-        "jsonSchema": true,
+        "jsonSchema": false,
         "strict": false
       },
       "promptCaching": {
-        "kind": "none"
+        "kind": "explicit"
       },
-      "assistantPrefill": false,
+      "assistantPrefill": true,
       "systemRole": "system",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
+      "reasoningRoundTrip": true
     },
     "params": {
       "temperature": {
@@ -235,24 +252,51 @@
         "type": "string[]",
         "wireName": "stop",
         "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified",
+        "default": true
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "thinking_budget",
+        "confidence": "verified",
+        "max": 131072,
+        "default": 131072
       }
     },
-    "constraints": [],
+    "constraints": [
+      {
+        "id": "thinking-no-named-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://help.aliyun.com/en/model-studio/deep-thinking — named tool choice is unsupported while thinking is enabled on Chat Completions; disable thinking or use an automatic choice (exact HTTP status NOT FOUND)"
+      }
+    ],
     "meta": {
-      "pricing": {
-        "inputPerMTok": 0,
-        "outputPerMTok": 0,
-        "cachedInputPerMTok": 0
-      },
       "knowledgeCutoff": "",
       "deprecated": false,
-      "availability": "OpenRouter preview route confirmed; exact non-preview native route not confirmed",
+      "availability": "international-available; live preview; direct route scheduled for decommission 2026-10-10 00:00 (replacement qwen3.7-max)",
       "sources": [
-        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://help.aliyun.com/zh/model-studio/qwen3-6-max",
+        "https://help.aliyun.com/zh/model-studio/text-generation-model",
+        "https://help.aliyun.com/zh/model-studio/text-generation",
+        "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+        "https://help.aliyun.com/en/model-studio/deep-thinking",
+        "https://help.aliyun.com/en/model-studio/model-depreciation",
         "https://openrouter.ai/api/v1/models"
       ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "partial"
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
     }
   },
   {
@@ -394,24 +438,36 @@
   },
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "qwen3-7-max",
-    "displayName": "Qwen3.7 Max",
+    "family": "qwen3-7-flash",
+    "displayName": "Qwen3.7 Flash",
     "company": "Qwen",
     "routes": [
       {
+        "providerId": "qwen",
+        "modelId": "qwen3.7-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "note": "Dated snapshot qwen3.7-flash-2026-07-15 available; prefer the dated pin for reproducibility. Model page max output 131,072 and max chain of thought 262,144 conflict with the provider vision overview's 64K output cap. Direct Singapore pricing is tiered CNY per MTok (<=32K: 0.225 in / 0.974 out; >32K-256K: 0.749 / 2.998; >256K: 1.499 / 5.995), so USD meta pricing is omitted."
+        }
+      },
+      {
         "providerId": "openrouter",
-        "modelId": "qwen/qwen3.7-max",
+        "modelId": "qwen/qwen3.7-flash",
         "wire": "openai-chat",
         "overrides": {
           "contextTokens": 1000000,
           "maxOutputTokens": 65536,
           "pricing": {
-            "inputPerMTok": 1.25,
-            "outputPerMTok": 3.75,
-            "cachedInputPerMTok": 0.25
+            "inputPerMTok": 0.03,
+            "outputPerMTok": 0.13,
+            "cachedInputPerMTok": 0.006
           },
           "modalities": [
-            "text"
+            "text",
+            "image",
+            "video"
           ],
           "supportedParameters": [
             "include_reasoning",
@@ -421,7 +477,6 @@
             "reasoning",
             "response_format",
             "seed",
-            "structured_outputs",
             "temperature",
             "tool_choice",
             "tools",
@@ -429,13 +484,226 @@
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Canonical slug qwen/qwen3.7-flash-20260727 (OpenRouter pin, not a provider release date). Base-tier pricing; live tier overrides raise it at 32,000 and 256,000 prompt tokens. Route reasoning is optional/default-on with no effort enum."
         }
       }
     ],
     "limits": {
       "contextTokens": 1000000,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 131072
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified",
+        "max": 1
+      },
+      "topK": {
+        "type": "int",
+        "wireName": "top_k",
+        "confidence": "verified",
+        "min": 0,
+        "default": 20
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "verified",
+        "max": 131072
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "unverified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2147483647,
+        "default": 1234
+      },
+      "presencePenalty": {
+        "type": "number",
+        "wireName": "presence_penalty",
+        "confidence": "verified",
+        "min": -2,
+        "max": 2
+      },
+      "logprobs": {
+        "type": "boolean",
+        "wireName": "logprobs",
+        "confidence": "unverified"
+      },
+      "topLogprobs": {
+        "type": "int",
+        "wireName": "top_logprobs",
+        "confidence": "unverified",
+        "min": 0,
+        "max": 5
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "verified",
+        "values": [
+          "text",
+          "json_object"
+        ],
+        "default": "text"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified",
+        "default": true
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "thinking_budget",
+        "confidence": "verified",
+        "max": 262144,
+        "default": 262144
+      }
+    },
+    "constraints": [
+      {
+        "id": "thinking-no-named-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://help.aliyun.com/en/model-studio/deep-thinking — named tool choice is unsupported while thinking is enabled on Chat Completions; disable thinking or use an automatic choice (exact HTTP status NOT FOUND)"
+      }
+    ],
+    "meta": {
+      "deprecated": false,
+      "availability": "international-available; current recommended stable (exact provider release date NOT FOUND)",
+      "sources": [
+        "https://help.aliyun.com/zh/model-studio/qwen3-7-flash",
+        "https://help.aliyun.com/zh/model-studio/text-generation-model",
+        "https://help.aliyun.com/en/model-studio/vision-model/",
+        "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+        "https://help.aliyun.com/en/model-studio/deep-thinking",
+        "https://help.aliyun.com/en/model-studio/qwen-structured-output",
+        "https://help.aliyun.com/en/model-studio/context-cache",
+        "https://help.aliyun.com/en/model-studio/base-url",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-7-max",
+    "displayName": "Qwen3.7 Max",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3.7-max",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "note": "Stable alias equivalent to the text-only snapshot qwen3.7-max-2026-05-20 (prefer the dated pin for reproducibility); qwen3.7-max-2026-06-08 is a distinct multimodal snapshot on a different interface — do not treat them as interchangeable. Text-generation interface only. Direct Singapore list pricing is CNY per MTok (18.736 in / 56.207 out; explicit-cache create 23.419 / hit 1.874; implicit-cache input 3.747; a limited-time 50% input/output promotion is announced with exact console price and end date NOT FOUND), so USD meta pricing is omitted."
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.7-max",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 1.475,
+            "outputPerMTok": 4.425,
+            "cachedInputPerMTok": 0.295
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Canonical slug qwen/qwen3.7-max-20260520 (OpenRouter pin, not a provider release date)."
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 131072
     },
     "modalities": {
       "input": [
@@ -447,28 +715,30 @@
     },
     "features": {
       "streaming": true,
-      "streamingUsage": false,
+      "streamingUsage": true,
       "tools": {
         "supported": true,
         "toolChoice": [
-          "auto"
+          "auto",
+          "none",
+          "named"
         ],
         "parallel": true,
-        "parallelDisable": false,
+        "parallelDisable": true,
         "strict": false
       },
       "structuredOutput": {
         "jsonMode": true,
-        "jsonSchema": true,
+        "jsonSchema": false,
         "strict": false
       },
       "promptCaching": {
-        "kind": "none"
+        "kind": "implicit"
       },
-      "assistantPrefill": false,
+      "assistantPrefill": true,
       "systemRole": "system",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
+      "reasoningRoundTrip": true
     },
     "params": {
       "temperature": {
@@ -485,30 +755,58 @@
         "type": "int",
         "wireName": "max_tokens",
         "confidence": "verified",
-        "max": 65536
+        "max": 131072
       },
       "stopSequences": {
         "type": "string[]",
         "wireName": "stop",
         "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified",
+        "default": true
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "thinking_budget",
+        "confidence": "verified",
+        "max": 262144,
+        "default": 262144
       }
     },
-    "constraints": [],
+    "constraints": [
+      {
+        "id": "thinking-no-named-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://help.aliyun.com/en/model-studio/deep-thinking — named tool choice is unsupported while thinking is enabled on Chat Completions; disable thinking or use an automatic choice (exact HTTP status NOT FOUND)"
+      }
+    ],
     "meta": {
-      "pricing": {
-        "inputPerMTok": 0,
-        "outputPerMTok": 0,
-        "cachedInputPerMTok": 0
-      },
       "knowledgeCutoff": "",
       "deprecated": false,
-      "availability": "OpenRouter route confirmed; native compatible-mode route unverified",
+      "availability": "international-available; current stable alias (exact alias release date NOT FOUND)",
       "sources": [
-        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://help.aliyun.com/zh/model-studio/qwen3-7-max",
+        "https://help.aliyun.com/zh/model-studio/text-generation-model",
+        "https://help.aliyun.com/zh/model-studio/text-generation",
+        "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+        "https://help.aliyun.com/en/model-studio/deep-thinking",
+        "https://help.aliyun.com/en/model-studio/context-cache",
+        "https://help.aliyun.com/en/model-studio/model-pricing",
         "https://openrouter.ai/api/v1/models"
       ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "partial"
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
     }
   },
   {
@@ -518,22 +816,33 @@
     "company": "Qwen",
     "routes": [
       {
+        "providerId": "qwen",
+        "modelId": "qwen3.7-plus",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "note": "Dated snapshot qwen3.7-plus-2026-05-26 available; prefer the dated pin for reproducibility. Direct docs include video input, which the OpenRouter route does not advertise (stored per route). Model page max output 131,072 conflicts with the provider vision overview's 64K. Direct Singapore pricing is tiered CNY per MTok (<=256K: 2.998 in / 11.991 out; >256K: 8.993 / 35.972), so USD meta pricing is omitted."
+        }
+      },
+      {
         "providerId": "openrouter",
         "modelId": "qwen/qwen3.7-plus",
         "wire": "openai-chat",
         "overrides": {
           "contextTokens": 1000000,
-          "maxOutputTokens": 65536,
+          "maxOutputTokens": 131072,
           "pricing": {
             "inputPerMTok": 0.32,
             "outputPerMTok": 1.28,
-            "cachedInputPerMTok": 0.08
+            "cachedInputPerMTok": 0.064
           },
           "modalities": [
             "text",
             "image"
           ],
           "supportedParameters": [
+            "frequency_penalty",
             "include_reasoning",
             "logprobs",
             "max_tokens",
@@ -541,26 +850,30 @@
             "reasoning",
             "response_format",
             "seed",
+            "stop",
             "structured_outputs",
             "temperature",
             "tool_choice",
             "tools",
+            "top_k",
             "top_logprobs",
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Canonical slug qwen/qwen3.7-plus-20260602 (OpenRouter pin). Base-tier pricing; a live tier override raises it at 256,000 prompt tokens. Route modalities are text+image only."
         }
       }
     ],
     "limits": {
       "contextTokens": 1000000,
-      "maxOutputTokens": 65536
+      "maxOutputTokens": 131072
     },
     "modalities": {
       "input": [
         "text",
-        "image"
+        "image",
+        "video"
       ],
       "output": [
         "text"
@@ -568,28 +881,30 @@
     },
     "features": {
       "streaming": true,
-      "streamingUsage": false,
+      "streamingUsage": true,
       "tools": {
         "supported": true,
         "toolChoice": [
-          "auto"
+          "auto",
+          "none",
+          "named"
         ],
         "parallel": true,
-        "parallelDisable": false,
+        "parallelDisable": true,
         "strict": false
       },
       "structuredOutput": {
         "jsonMode": true,
-        "jsonSchema": true,
+        "jsonSchema": false,
         "strict": false
       },
       "promptCaching": {
-        "kind": "none"
+        "kind": "implicit"
       },
-      "assistantPrefill": false,
+      "assistantPrefill": true,
       "systemRole": "system",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
+      "reasoningRoundTrip": true
     },
     "params": {
       "temperature": {
@@ -606,29 +921,266 @@
         "type": "int",
         "wireName": "max_tokens",
         "confidence": "verified",
-        "max": 65536
+        "max": 131072
       },
       "stopSequences": {
         "type": "string[]",
         "wireName": "stop",
         "confidence": "verified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified",
+        "default": true
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "thinking_budget",
+        "confidence": "verified",
+        "max": 262144,
+        "default": 262144
       }
     },
-    "constraints": [],
+    "constraints": [
+      {
+        "id": "thinking-no-named-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://help.aliyun.com/en/model-studio/deep-thinking — named tool choice is unsupported while thinking is enabled on Chat Completions; disable thinking or use an automatic choice (exact HTTP status NOT FOUND)"
+      }
+    ],
     "meta": {
-      "pricing": {
-        "inputPerMTok": 0,
-        "outputPerMTok": 0,
-        "cachedInputPerMTok": 0
-      },
       "knowledgeCutoff": "",
       "deprecated": false,
-      "availability": "OpenRouter route confirmed; native route not found",
+      "availability": "international-available; current recommended stable (exact provider release date NOT FOUND)",
       "sources": [
-        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://help.aliyun.com/zh/model-studio/qwen3-7-plus",
+        "https://help.aliyun.com/zh/model-studio/text-generation-model",
+        "https://help.aliyun.com/en/model-studio/vision-model/",
+        "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+        "https://help.aliyun.com/en/model-studio/deep-thinking",
+        "https://help.aliyun.com/en/model-studio/context-cache",
         "https://openrouter.ai/api/v1/models"
       ],
-      "verifiedAt": "2026-06-10",
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "qwen3-8-max",
+    "displayName": "Qwen3.8 Max",
+    "company": "Qwen",
+    "routes": [
+      {
+        "providerId": "qwen",
+        "modelId": "qwen3.8-max",
+        "wire": "openai-chat",
+        "overrides": {
+          "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          "endpoint": "/chat/completions",
+          "note": "Stable alias only; no first-party dated snapshot found. Exact direct max output and the first-party modality row are NOT FOUND; doc modalities reflect the live OpenRouter object. Direct Singapore pricing is CNY per MTok (14.988 in / 44.965 out; qwen3.8 is an explicit-cache-hit-price exception whose exact hit price is console-only), so USD meta pricing is omitted."
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "qwen/qwen3.8-max",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1000000,
+          "maxOutputTokens": 131072,
+          "pricing": {
+            "inputPerMTok": 2.0,
+            "outputPerMTok": 6.0,
+            "cachedInputPerMTok": 0.25
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Canonical slug qwen/qwen3.8-max-20260803 (OpenRouter pin, not a provider release date). Route-specific reasoning is mandatory/default-on with efforts minimal|low|medium|high|xhigh (default xhigh); the direct Chat route has no effort wire."
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1000000,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": true,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": false,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": true,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "verified",
+        "max": 1
+      },
+      "topK": {
+        "type": "int",
+        "wireName": "top_k",
+        "confidence": "verified",
+        "min": 0,
+        "default": 20
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified"
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "stop",
+        "confidence": "unverified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2147483647,
+        "default": 1234
+      },
+      "presencePenalty": {
+        "type": "number",
+        "wireName": "presence_penalty",
+        "confidence": "verified",
+        "min": -2,
+        "max": 2
+      },
+      "logprobs": {
+        "type": "boolean",
+        "wireName": "logprobs",
+        "confidence": "unverified"
+      },
+      "topLogprobs": {
+        "type": "int",
+        "wireName": "top_logprobs",
+        "confidence": "unverified",
+        "min": 0,
+        "max": 5
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "verified",
+        "values": [
+          "text",
+          "json_object"
+        ],
+        "default": "text"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "enable_thinking",
+        "confidence": "verified",
+        "default": true
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "thinking_budget",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "thinking-no-named-tool-choice",
+        "when": {
+          "param": "reasoning.enabled",
+          "eq": true
+        },
+        "then": {
+          "forbid": [
+            "toolChoice:named"
+          ]
+        },
+        "source": "https://help.aliyun.com/en/model-studio/deep-thinking — named tool choice is unsupported while thinking is enabled on Chat Completions; disable thinking or use an automatic choice (exact HTTP status NOT FOUND)"
+      }
+    ],
+    "meta": {
+      "deprecated": false,
+      "availability": "international-available; current recommended stable (exact provider release date and dated snapshot NOT FOUND)",
+      "sources": [
+        "https://help.aliyun.com/zh/model-studio/text-generation-model",
+        "https://help.aliyun.com/en/model-studio/model-pricing",
+        "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+        "https://help.aliyun.com/en/model-studio/deep-thinking",
+        "https://help.aliyun.com/en/model-studio/context-cache",
+        "https://help.aliyun.com/en/model-studio/base-url",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-08-05",
       "confidence": "partial"
     }
   },
@@ -655,7 +1207,9 @@
         "overrides": {
           "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
           "endpoint": "/chat/completions",
-          "mode": "non-thinking-only"
+          "mode": "non-thinking-only",
+          "status": "deprecated",
+          "note": "Provider-announced direct decommission 2026-10-10 00:00; recommended replacement qwen3.7-plus. Applies to this direct route only — the OpenRouter route stays live and does not inherit the EOL."
         }
       },
       {
@@ -666,8 +1220,8 @@
           "contextTokens": 262144,
           "maxOutputTokens": 16384,
           "pricing": {
-            "inputPerMTok": 0.09,
-            "outputPerMTok": 0.1,
+            "inputPerMTok": 0.1495,
+            "outputPerMTok": 0.598,
             "cachedInputPerMTok": null
           },
           "modalities": [
@@ -764,13 +1318,14 @@
       },
       "knowledgeCutoff": "",
       "deprecated": false,
-      "availability": "international-available; legacy/no longer recommended for new projects",
+      "availability": "international-available; legacy/no longer recommended for new projects; direct qwen3-235b-a22b-instruct-2507 scheduled for decommission 2026-10-10 00:00 (replacement qwen3.7-plus)",
       "sources": [
         "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
         "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://help.aliyun.com/en/model-studio/model-depreciation",
         "https://openrouter.ai/api/v1/models"
       ],
-      "verifiedAt": "2026-06-10",
+      "verifiedAt": "2026-08-05",
       "confidence": "verified"
     }
   }

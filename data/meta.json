@@ -1,0 +1,141 @@
+[
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "muse-spark-1-1",
+    "displayName": "Muse Spark 1.1",
+    "company": "Meta",
+    "routes": [
+      {
+        "providerId": "openrouter",
+        "modelId": "meta/muse-spark-1.1",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": null,
+          "pricing": {
+            "inputPerMTok": 1.25,
+            "outputPerMTok": 4.25,
+            "cachedInputPerMTok": 0.15
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "file",
+            "audio"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "response_format",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "file",
+        "audio"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [],
+        "parallel": false,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "temperature",
+        "confidence": "unverified"
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "top_p",
+        "confidence": "unverified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "max_tokens",
+        "confidence": "unverified"
+      },
+      "responseFormat": {
+        "type": "enum",
+        "wireName": "response_format.type",
+        "confidence": "unverified",
+        "values": [
+          "text",
+          "json_object",
+          "json_schema"
+        ]
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "reasoning.effort",
+        "confidence": "unverified",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
+    },
+    "constraints": [],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 4.25,
+        "cachedInputPerMTok": 0.15
+      },
+      "deprecated": false,
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
+      "sources": [
+        "https://openrouter.ai/api/v1/models",
+        "https://ai.meta.com/blog/introducing-muse-spark-meta-model-api/"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "partial"
+    }
+  }
+]
