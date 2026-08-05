@@ -10,11 +10,11 @@
         "modelId": "mistralai/mistral-small-3.2-24b-instruct",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 128000,
+          "contextTokens": 256000,
           "maxOutputTokens": 16384,
           "pricing": {
-            "inputPerMTok": 0.075,
-            "outputPerMTok": 0.2,
+            "inputPerMTok": 0.09375,
+            "outputPerMTok": 0.25,
             "cachedInputPerMTok": null
           },
           "modalities": [

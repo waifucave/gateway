@@ -1,136 +1,6 @@
 [
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "gemini-2-0-flash",
-    "displayName": "Gemini 2.0 Flash",
-    "company": "Google",
-    "routes": [
-      {
-        "providerId": "google-ai-studio",
-        "modelId": "gemini-2.0-flash",
-        "wire": "google-generative-language",
-        "overrides": {
-          "baseUrl": "https://generativelanguage.googleapis.com",
-          "endpoint": ":generateContent"
-        }
-      }
-    ],
-    "limits": {
-      "contextTokens": 1048576,
-      "maxOutputTokens": 8192
-    },
-    "modalities": {
-      "input": [
-        "text",
-        "image",
-        "video",
-        "audio"
-      ],
-      "output": [
-        "text"
-      ]
-    },
-    "features": {
-      "streaming": true,
-      "streamingUsage": false,
-      "tools": {
-        "supported": true,
-        "toolChoice": [
-          "auto",
-          "none"
-        ],
-        "parallel": false,
-        "parallelDisable": false,
-        "strict": false
-      },
-      "structuredOutput": {
-        "jsonMode": true,
-        "jsonSchema": true,
-        "strict": false
-      },
-      "promptCaching": {
-        "kind": "explicit"
-      },
-      "assistantPrefill": false,
-      "systemRole": "systemInstruction",
-      "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
-    },
-    "params": {
-      "temperature": {
-        "type": "number",
-        "wireName": "generationConfig.temperature",
-        "confidence": "verified",
-        "min": 0,
-        "max": 2
-      },
-      "topP": {
-        "type": "number",
-        "wireName": "generationConfig.topP",
-        "confidence": "verified"
-      },
-      "topK": {
-        "type": "int",
-        "wireName": "generationConfig.topK",
-        "confidence": "verified"
-      },
-      "maxOutputTokens": {
-        "type": "int",
-        "wireName": "generationConfig.maxOutputTokens",
-        "confidence": "verified",
-        "max": 8192
-      },
-      "stopSequences": {
-        "type": "string[]",
-        "wireName": "generationConfig.stopSequences",
-        "confidence": "verified",
-        "maxItems": 5
-      },
-      "seed": {
-        "type": "int",
-        "wireName": "generationConfig.seed",
-        "confidence": "verified"
-      },
-      "reasoning.budgetTokens": {
-        "type": "int",
-        "wireName": "generationConfig.thinkingConfig.thinkingBudget",
-        "confidence": "unverified"
-      },
-      "reasoning.effort": {
-        "type": "enum",
-        "wireName": "generationConfig.thinkingConfig.thinkingLevel",
-        "confidence": "verified",
-        "values": []
-      },
-      "google.safetySettings": {
-        "type": "map",
-        "wireName": "safetySettings",
-        "confidence": "verified"
-      }
-    },
-    "constraints": [],
-    "meta": {
-      "pricing": {
-        "inputPerMTok": 0,
-        "outputPerMTok": 0,
-        "cachedInputPerMTok": 0
-      },
-      "knowledgeCutoff": "August 2024",
-      "deprecated": true,
-      "availability": "shut down June 1, 2026",
-      "sources": [
-        "https://ai.google.dev/gemini-api/docs/models/gemini-2.0-flash",
-        "https://ai.google.dev/api/generate-content",
-        "https://ai.google.dev/gemini-api/docs/thinking",
-        "https://ai.google.dev/gemini-api/docs/function-calling",
-        "https://ai.google.dev/gemini-api/docs/deprecations"
-      ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "verified"
-    }
-  },
-  {
-    "schema": "starlight.capability-doc.v1",
     "family": "gemini-2-5-flash-lite",
     "displayName": "Gemini 2.5 Flash Lite",
     "company": "Google",
@@ -973,7 +843,7 @@
       },
       "knowledgeCutoff": "January 2025",
       "deprecated": false,
-      "availability": "stable; shutdown scheduled May 7, 2027",
+      "availability": "stable; earliest possible shutdown May 7, 2027 (exact date not yet announced); replacement gemini-3.5-flash-lite",
       "sources": [
         "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
         "https://ai.google.dev/api/generate-content",
@@ -1161,6 +1031,438 @@
   },
   {
     "schema": "starlight.capability-doc.v1",
+    "family": "gemini-3-5-flash-lite",
+    "displayName": "Gemini 3.5 Flash Lite",
+    "company": "Google",
+    "routes": [
+      {
+        "providerId": "google-ai-studio",
+        "modelId": "gemini-3.5-flash-lite",
+        "wire": "google-generative-language",
+        "overrides": {
+          "baseUrl": "https://generativelanguage.googleapis.com",
+          "endpoint": ":generateContent"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "google/gemini-3.5-flash-lite",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 2.5,
+            "cachedInputPerMTok": 0.03
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "file",
+            "audio"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "required",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "explicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "systemInstruction",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "generationConfig.temperature",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "generationConfig.topP",
+        "confidence": "verified"
+      },
+      "topK": {
+        "type": "int",
+        "wireName": "generationConfig.topK",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "generationConfig.maxOutputTokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "generationConfig.stopSequences",
+        "confidence": "verified",
+        "maxItems": 5
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "generationConfig.seed",
+        "confidence": "verified"
+      },
+      "responseFormat": {
+        "type": "map",
+        "wireName": "generationConfig.responseMimeType",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "generationConfig.thinkingConfig.thinkingLevel",
+        "confidence": "verified",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "minimal"
+      },
+      "google.safetySettings": {
+        "type": "map",
+        "wireName": "safetySettings",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "sampling-ignored-deprecated",
+        "when": {
+          "anyOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            },
+            {
+              "param": "topK"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "temperature",
+            "topP",
+            "topK"
+          ]
+        },
+        "source": "https://ai.google.dev/gemini-api/docs/latest-model — temperature/topP/topK are deprecated and ignored on this model (live 2026-08-05: temperature accepted with HTTP 200, no effect); a future model generation will return HTTP 400"
+      },
+      {
+        "id": "no-candidate-count",
+        "when": {
+          "param": "candidateCount"
+        },
+        "then": {
+          "forbid": [
+            "candidateCount"
+          ]
+        },
+        "source": "https://ai.google.dev/gemini-api/docs/latest-model — candidateCount is unsupported for Gemini 3.x; omit it"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.3,
+        "outputPerMTok": 2.5,
+        "cachedInputPerMTok": 0.03
+      },
+      "deprecated": false,
+      "availability": "stable; GA July 21, 2026",
+      "sources": [
+        "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite",
+        "https://ai.google.dev/gemini-api/docs/latest-model",
+        "https://ai.google.dev/api/generate-content",
+        "https://ai.google.dev/gemini-api/docs/thinking",
+        "https://ai.google.dev/gemini-api/docs/generate-content/gemini-3",
+        "https://ai.google.dev/gemini-api/docs/function-calling",
+        "https://ai.google.dev/gemini-api/docs/pricing",
+        "https://ai.google.dev/gemini-api/docs/deprecations",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "gemini-3-6-flash",
+    "displayName": "Gemini 3.6 Flash",
+    "company": "Google",
+    "routes": [
+      {
+        "providerId": "google-ai-studio",
+        "modelId": "gemini-3.6-flash",
+        "wire": "google-generative-language",
+        "overrides": {
+          "baseUrl": "https://generativelanguage.googleapis.com",
+          "endpoint": ":generateContent"
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "google/gemini-3.6-flash",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 1.5,
+            "outputPerMTok": 7.5,
+            "cachedInputPerMTok": 0.15
+          },
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "file",
+            "audio"
+          ],
+          "supportedParameters": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models"
+        }
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "pdf"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto",
+          "none",
+          "required",
+          "named"
+        ],
+        "parallel": true,
+        "parallelDisable": false,
+        "strict": false
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": false
+      },
+      "promptCaching": {
+        "kind": "explicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "systemInstruction",
+      "multipleSystemMessages": false,
+      "reasoningRoundTrip": true
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "wireName": "generationConfig.temperature",
+        "confidence": "verified",
+        "min": 0,
+        "max": 2
+      },
+      "topP": {
+        "type": "number",
+        "wireName": "generationConfig.topP",
+        "confidence": "verified"
+      },
+      "topK": {
+        "type": "int",
+        "wireName": "generationConfig.topK",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "wireName": "generationConfig.maxOutputTokens",
+        "confidence": "verified",
+        "max": 65536
+      },
+      "stopSequences": {
+        "type": "string[]",
+        "wireName": "generationConfig.stopSequences",
+        "confidence": "verified",
+        "maxItems": 5
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "generationConfig.seed",
+        "confidence": "verified"
+      },
+      "responseFormat": {
+        "type": "map",
+        "wireName": "generationConfig.responseMimeType",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "wireName": "generationConfig.thinkingConfig.thinkingLevel",
+        "confidence": "verified",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "medium"
+      },
+      "google.safetySettings": {
+        "type": "map",
+        "wireName": "safetySettings",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "sampling-ignored-deprecated",
+        "when": {
+          "anyOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            },
+            {
+              "param": "topK"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "temperature",
+            "topP",
+            "topK"
+          ]
+        },
+        "source": "https://ai.google.dev/gemini-api/docs/latest-model — temperature/topP/topK are deprecated and ignored on this model (live 2026-08-05: temperature accepted with HTTP 200, no effect); a future model generation will return HTTP 400"
+      },
+      {
+        "id": "no-candidate-count",
+        "when": {
+          "param": "candidateCount"
+        },
+        "then": {
+          "forbid": [
+            "candidateCount"
+          ]
+        },
+        "source": "https://ai.google.dev/gemini-api/docs/latest-model — candidateCount is unsupported for Gemini 3.x; omit it"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.5,
+        "outputPerMTok": 7.5,
+        "cachedInputPerMTok": 0.15
+      },
+      "deprecated": false,
+      "availability": "stable; GA July 21, 2026",
+      "sources": [
+        "https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash",
+        "https://ai.google.dev/gemini-api/docs/latest-model",
+        "https://ai.google.dev/api/generate-content",
+        "https://ai.google.dev/gemini-api/docs/thinking",
+        "https://ai.google.dev/gemini-api/docs/generate-content/gemini-3",
+        "https://ai.google.dev/gemini-api/docs/function-calling",
+        "https://ai.google.dev/gemini-api/docs/pricing",
+        "https://ai.google.dev/gemini-api/docs/deprecations",
+        "https://openrouter.ai/api/v1/models"
+      ],
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
     "family": "gemma-4-26b-a4b-it",
     "displayName": "Gemma 4 26B A4B IT",
     "company": "Google",
@@ -1182,8 +1484,8 @@
           "contextTokens": 262144,
           "maxOutputTokens": null,
           "pricing": {
-            "inputPerMTok": 0.06,
-            "outputPerMTok": 0.33,
+            "inputPerMTok": 0.07,
+            "outputPerMTok": 0.34,
             "cachedInputPerMTok": null
           },
           "modalities": [
@@ -1355,9 +1657,9 @@
           "contextTokens": 262144,
           "maxOutputTokens": 8192,
           "pricing": {
-            "inputPerMTok": 0.12,
-            "outputPerMTok": 0.35,
-            "cachedInputPerMTok": 0.09
+            "inputPerMTok": 0.1,
+            "outputPerMTok": 0.34,
+            "cachedInputPerMTok": 0.1
           },
           "modalities": [
             "text",

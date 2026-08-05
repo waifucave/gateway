@@ -1,21 +1,21 @@
 [
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "trinity-large-thinking",
-    "displayName": "Trinity Large Thinking",
-    "company": "Arcee AI",
+    "family": "longcat-2-0",
+    "displayName": "LongCat 2.0",
+    "company": "Meituan",
     "routes": [
       {
         "providerId": "openrouter",
-        "modelId": "arcee-ai/trinity-large-thinking",
+        "modelId": "meituan/longcat-2.0",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 262144,
+          "contextTokens": 1048756,
           "maxOutputTokens": 262144,
           "pricing": {
-            "inputPerMTok": 0.22,
-            "outputPerMTok": 0.85,
-            "cachedInputPerMTok": 0.06
+            "inputPerMTok": 0.3,
+            "outputPerMTok": 1.2,
+            "cachedInputPerMTok": 0.006
           },
           "modalities": [
             "text"
@@ -24,30 +24,26 @@
             "frequency_penalty",
             "include_reasoning",
             "logit_bias",
-            "logprobs",
             "max_tokens",
+            "min_p",
             "presence_penalty",
             "reasoning",
             "repetition_penalty",
-            "response_format",
             "seed",
             "stop",
-            "structured_outputs",
             "temperature",
             "tool_choice",
             "tools",
             "top_k",
-            "top_logprobs",
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models",
-          "note": "Reasoning model: pass returned reasoning_details back unchanged on assistant messages; dropping them loses reasoning state."
+          "source": "https://openrouter.ai/api/v1/models"
         }
       }
     ],
     "limits": {
-      "contextTokens": 262144,
+      "contextTokens": 1048756,
       "maxOutputTokens": 262144
     },
     "modalities": {
@@ -79,52 +75,60 @@
       "assistantPrefill": false,
       "systemRole": "system",
       "multipleSystemMessages": false,
-      "reasoningRoundTrip": true
+      "reasoningRoundTrip": false
     },
     "params": {
       "temperature": {
         "type": "number",
         "wireName": "temperature",
-        "confidence": "verified",
-        "default": 0.3
+        "confidence": "unverified"
       },
       "topP": {
         "type": "number",
         "wireName": "top_p",
-        "confidence": "verified",
-        "default": 0.8
+        "confidence": "unverified"
       },
       "maxOutputTokens": {
         "type": "int",
         "wireName": "max_tokens",
-        "confidence": "verified",
-        "max": 262144
+        "confidence": "unverified"
       },
       "stopSequences": {
         "type": "string[]",
         "wireName": "stop",
-        "confidence": "verified"
+        "confidence": "unverified"
+      },
+      "seed": {
+        "type": "int",
+        "wireName": "seed",
+        "confidence": "unverified"
+      },
+      "reasoning.enabled": {
+        "type": "boolean",
+        "wireName": "reasoning.enabled",
+        "confidence": "unverified"
+      },
+      "reasoning.budgetTokens": {
+        "type": "int",
+        "wireName": "reasoning.max_tokens",
+        "confidence": "unverified"
       }
     },
     "constraints": [],
     "meta": {
       "pricing": {
-        "inputPerMTok": 0.25,
-        "outputPerMTok": 0.8
+        "inputPerMTok": 0.3,
+        "outputPerMTok": 1.2,
+        "cachedInputPerMTok": 0.006
       },
-      "knowledgeCutoff": "2024",
       "deprecated": false,
-      "availability": "OpenRouter-only; the gateway has no Arcee provider entry. Distinct 2026-04-01 successor to the retired trinity-large family, whose OpenRouter slug arcee-ai/trinity-large was quietly delisted.",
+      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
       "sources": [
-        "https://www.arcee.ai/blog/trinity-large-thinking",
-        "https://docs.arcee.ai/get-started/models-overview.md",
-        "https://docs.arcee.ai/language-models/trinity-large-thinking.md",
-        "https://docs.arcee.ai/capabilities/reasoning-traces.md",
-        "https://docs.arcee.ai/get-started/pricing.md",
-        "https://openrouter.ai/api/v1/models"
+        "https://openrouter.ai/api/v1/models",
+        "https://www.meituan.com/news/NN260630164005904"
       ],
       "verifiedAt": "2026-08-05",
-      "confidence": "verified"
+      "confidence": "partial"
     }
   }
 ]

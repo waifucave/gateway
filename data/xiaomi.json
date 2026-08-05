@@ -1,108 +1,6 @@
 [
   {
     "schema": "starlight.capability-doc.v1",
-    "family": "mimo-v2-flash",
-    "displayName": "MiMo V2 Flash",
-    "company": "Xiaomi",
-    "routes": [
-      {
-        "providerId": "xiaomi",
-        "modelId": "mimo-v2-flash",
-        "wire": "openai-chat",
-        "overrides": {
-          "baseUrl": "https://api.xiaomimimo.com/v1",
-          "endpoint": "/chat/completions",
-          "anthropicEndpoint": "https://api.xiaomimimo.com/anthropic/v1/messages"
-        }
-      }
-    ],
-    "limits": {
-      "contextTokens": 262144,
-      "maxOutputTokens": 65536
-    },
-    "modalities": {
-      "input": [
-        "text"
-      ],
-      "output": [
-        "text"
-      ]
-    },
-    "features": {
-      "streaming": true,
-      "streamingUsage": false,
-      "tools": {
-        "supported": true,
-        "toolChoice": [
-          "auto"
-        ],
-        "parallel": true,
-        "parallelDisable": false,
-        "strict": false
-      },
-      "structuredOutput": {
-        "jsonMode": true,
-        "jsonSchema": true,
-        "strict": false
-      },
-      "promptCaching": {
-        "kind": "implicit"
-      },
-      "assistantPrefill": false,
-      "systemRole": "system",
-      "multipleSystemMessages": false,
-      "reasoningRoundTrip": false
-    },
-    "params": {
-      "temperature": {
-        "type": "number",
-        "wireName": "temperature",
-        "confidence": "verified"
-      },
-      "topP": {
-        "type": "number",
-        "wireName": "top_p",
-        "confidence": "verified"
-      },
-      "maxOutputTokens": {
-        "type": "int",
-        "wireName": "max_tokens",
-        "confidence": "verified",
-        "max": 65536
-      },
-      "stopSequences": {
-        "type": "string[]",
-        "wireName": "stop",
-        "confidence": "verified"
-      },
-      "reasoning.enabled": {
-        "type": "boolean",
-        "wireName": "thinking.type",
-        "confidence": "verified"
-      }
-    },
-    "constraints": [],
-    "meta": {
-      "pricing": {
-        "inputPerMTok": 0.1,
-        "outputPerMTok": 0.3,
-        "cachedInputPerMTok": 0.01
-      },
-      "knowledgeCutoff": "",
-      "deprecated": false,
-      "availability": "available",
-      "sources": [
-        "https://platform.xiaomimimo.com/docs/en-US/quick-start/model",
-        "https://platform.xiaomimimo.com/docs/en-US/api/chat/openai-api",
-        "https://platform.xiaomimimo.com/docs/en-US/api/chat/anthropic-api",
-        "https://openrouter.ai/api/v1/models"
-      ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "verified"
-    }
-  },
-  {
-    "schema": "starlight.capability-doc.v1",
     "family": "mimo-v2-5",
     "displayName": "MiMo V2.5",
     "company": "Xiaomi",
@@ -122,10 +20,10 @@
         "modelId": "xiaomi/mimo-v2.5",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 1048576,
+          "contextTokens": 1050000,
           "maxOutputTokens": 131072,
           "pricing": {
-            "inputPerMTok": 0.105,
+            "inputPerMTok": 0.14,
             "outputPerMTok": 0.28,
             "cachedInputPerMTok": 0.0028
           },
@@ -263,7 +161,7 @@
         "modelId": "xiaomi/mimo-v2.5-pro",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 1048576,
+          "contextTokens": 1050000,
           "maxOutputTokens": 131072,
           "pricing": {
             "inputPerMTok": 0.435,

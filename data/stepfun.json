@@ -162,7 +162,7 @@
         "modelId": "stepfun/step-3.7-flash",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 256000,
+          "contextTokens": 262144,
           "maxOutputTokens": 256000,
           "pricing": {
             "inputPerMTok": 0.2,

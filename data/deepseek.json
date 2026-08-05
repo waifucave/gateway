@@ -10,12 +10,12 @@
         "modelId": "deepseek/deepseek-v3.2",
         "wire": "openai-chat",
         "overrides": {
-          "contextTokens": 131072,
+          "contextTokens": 163840,
           "maxOutputTokens": 64000,
           "pricing": {
-            "inputPerMTok": 0.2288,
-            "outputPerMTok": 0.3432,
-            "cachedInputPerMTok": null
+            "inputPerMTok": 0.269,
+            "outputPerMTok": 0.4,
+            "cachedInputPerMTok": 0.1345
           },
           "modalities": [
             "text"
@@ -137,7 +137,8 @@
         "wire": "openai-chat",
         "overrides": {
           "baseUrl": "https://api.deepseek.com",
-          "endpoint": "/chat/completions"
+          "endpoint": "/chat/completions",
+          "note": "Moving alias: as of 2026-08-05 it resolves to DeepSeek-V4-Flash-0731 (public beta, released 2026-07-31; same architecture/parameter size as the April preview with updated post-training). No dated direct pin is documented."
         }
       },
       {
@@ -146,11 +147,11 @@
         "wire": "openai-chat",
         "overrides": {
           "contextTokens": 1048576,
-          "maxOutputTokens": 131072,
+          "maxOutputTokens": 393216,
           "pricing": {
-            "inputPerMTok": 0.089,
-            "outputPerMTok": 0.18,
-            "cachedInputPerMTok": 0.0197
+            "inputPerMTok": 0.14,
+            "outputPerMTok": 0.28,
+            "cachedInputPerMTok": 0.028
           },
           "modalities": [
             "text"
@@ -164,6 +165,7 @@
             "min_p",
             "presence_penalty",
             "reasoning",
+            "reasoning_effort",
             "repetition_penalty",
             "response_format",
             "seed",
@@ -172,12 +174,57 @@
             "temperature",
             "tool_choice",
             "tools",
+            "top_a",
             "top_k",
             "top_logprobs",
             "top_p"
           ],
           "status": "listed",
-          "source": "https://openrouter.ai/api/v1/models"
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Unpinned base slug; canonical deepseek/deepseek-v4-flash-20260423 (April snapshot). Not an alias of the dated 0731 route at the catalog-data level: limits, prices, and reasoning-effort sets differ (this route: efforts xhigh|high, default high)."
+        }
+      },
+      {
+        "providerId": "openrouter",
+        "modelId": "deepseek/deepseek-v4-flash-0731",
+        "wire": "openai-chat",
+        "overrides": {
+          "contextTokens": 1048576,
+          "maxOutputTokens": 65536,
+          "pricing": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.18,
+            "cachedInputPerMTok": 0.018
+          },
+          "modalities": [
+            "text"
+          ],
+          "supportedParameters": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logit_bias",
+            "logprobs",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_a",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ],
+          "status": "listed",
+          "source": "https://openrouter.ai/api/v1/models",
+          "note": "Dated pin of the 0731 public-beta snapshot; canonical slug deepseek/deepseek-v4-flash-20260731 (Hugging Face deepseek-ai/DeepSeek-V4-Flash-0731). Recommended when reproducibility matters. Route reasoning: default-enabled, efforts max|high|low, default high."
         }
       }
     ],
@@ -271,6 +318,7 @@
         "wireName": "reasoning_effort",
         "confidence": "verified",
         "values": [
+          "low",
           "high",
           "max"
         ],
@@ -322,11 +370,14 @@
         "https://api-docs.deepseek.com/api/create-chat-completion",
         "https://api-docs.deepseek.com/quick_start/pricing",
         "https://api-docs.deepseek.com/guides/thinking_mode",
+        "https://api-docs.deepseek.com/updates/",
+        "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731",
         "https://openrouter.ai/api/v1/models",
         "live API test 2026-06-10 (thinking x tool_choice)"
       ],
-      "verifiedAt": "2026-06-10",
-      "confidence": "verified"
+      "verifiedAt": "2026-08-05",
+      "confidence": "verified",
+      "availability": "Direct alias resolves to the DeepSeek-V4-Flash-0731 public-beta snapshot (released 2026-07-31); V4 Pro was explicitly not upgraded. A future Beijing peak-hours 2x pricing multiplier is announced with effective date TBD."
     }
   },
   {
