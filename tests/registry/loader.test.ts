@@ -5,12 +5,12 @@ import { Registry } from "../../src/registry/loader.js";
 const registry = Registry.load();
 
 describe("Registry", () => {
-  it("loads 72 families and flattens all routes", () => {
+  it("loads 77 families and flattens all routes", () => {
     // openrouter/owl-alpha dropped 2026-07-02: gone from OpenRouter's public
     // /models list (no "owl"/"alpha" id anywhere in the live catalog) and it
     // had no other route, so the whole family was removed.
-    expect(registry.listFamilies()).toHaveLength(72);
-    expect(registry.listModels().length).toBeGreaterThan(72);
+    expect(registry.listFamilies()).toHaveLength(77);
+    expect(registry.listModels().length).toBeGreaterThan(77);
   });
 
   it("resolves a native route with provider-table base URL fallback", () => {

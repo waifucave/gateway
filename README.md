@@ -1,6 +1,6 @@
 # @waifucave/gateway
 
-Provider-agnostic LLM normalization layer: a curated capability registry for 54 model families (100 routes) across 15 companies, per-model parameter validation with declarative quirk constraints, a unified chat API over OpenRouter + 13 direct providers, an HTTP gateway server, and a drift-sync CLI.
+Provider-agnostic LLM normalization layer: a curated capability registry for 77 model families (146 routes) across 20 companies, per-model parameter validation with declarative quirk constraints, a unified chat API over OpenRouter + 14 direct providers, an HTTP gateway server, and a drift-sync CLI.
 
 **Status: P1c complete.** Registry, validation engine, the four wire codecs, transport, and the client are complete. HTTP server (`createGatewayHandler`, `serve`), Fastify plugin (`@waifucave/gateway/fastify`), and the `gateway serve` / `gateway sync` CLI commands are all shipped.
 
@@ -23,6 +23,27 @@ validateRequest(model, { params: {}, toolChoice: "required" });
 The published npm package ships the compiled build (`dist/`) plus `data/` — not the TypeScript source. Build from source with `npm install && npm run build`; test with `npm test`.
 
 ## Client usage
+
+### Meta Muse Spark
+
+The direct `meta` provider uses `https://api.meta.ai/v1` and `MODEL_API_KEY`
+(or the `meta` credential entry). Models: `muse-spark-1.1`, `muse-spark-1.2`,
+`muse-spark-1.3`, `muse-spark-1.2-contributor`, and `muse-spark-1.3-contributor`.
+Contributor models permit Meta to train on prompts and completions; they are
+explicit selections, never automatic replacements for Standard models.
+
+Use `reasoning.effort` (`minimal`, `low`, `medium`, `high`, `xhigh`; `max` only
+on Standard 1.3). Reasoning cannot be disabled and is not exposed/replayed by
+the Chat Completions API. `maxOutputTokens` maps to `max_completion_tokens` and
+includes hidden reasoning tokens. Tool choice supports only `auto`; use JSON
+schema output for mandatory structured decisions. This adapter supports text
+and image inputs, not the vendor's full audio/video/PDF surface.
+
+Sources checked 2026-10-12: [models](https://dev.meta.ai/docs/models),
+[reasoning](https://dev.meta.ai/docs/reasoning),
+[tool calling](https://dev.meta.ai/docs/tool-calling), and
+[Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions).
+Coverage is documentation-backed and fake-transport tested, not a live-key test.
 
 ```ts
 import { createGateway } from "@waifucave/gateway";

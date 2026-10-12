@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import { PROVIDERS, getProvider } from "../../src/registry/providers.js";
 
 describe("provider table", () => {
-  it("contains the 14 v1 providers with unique ids", () => {
-    expect(PROVIDERS).toHaveLength(14);
-    expect(new Set(PROVIDERS.map((p) => p.id)).size).toBe(14);
+  it("contains the 15 v1 providers with unique ids", () => {
+    expect(PROVIDERS).toHaveLength(15);
+    expect(new Set(PROVIDERS.map((p) => p.id)).size).toBe(15);
     expect(getProvider("openrouter")?.baseUrl).toBe("https://openrouter.ai/api/v1");
     expect(getProvider("xiaomi")?.baseUrl).toBe("https://api.xiaomimimo.com/v1");
     expect(getProvider("nope")).toBeUndefined();

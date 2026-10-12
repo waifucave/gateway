@@ -22,7 +22,7 @@ describe("serve", () => {
     const response = await fetch(`${running.url}/v1/providers`);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { providers: Array<{ id: string; credentialConfigured: boolean }> };
-    expect(body.providers).toHaveLength(14);
+    expect(body.providers).toHaveLength(15);
     expect(body.providers.find((p) => p.id === "deepseek")?.credentialConfigured).toBe(true);
     expect(body.providers.find((p) => p.id === "anthropic")?.credentialConfigured).toBe(false);
   });

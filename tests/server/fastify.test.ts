@@ -20,7 +20,7 @@ describe("gatewayPlugin", () => {
     await app.register(gatewayPlugin, { prefix: "/api/llm", credentials: { deepseek: "sk-test" } });
     const providers = await app.inject({ method: "GET", url: "/api/llm/v1/providers" });
     expect(providers.statusCode).toBe(200);
-    expect((providers.json() as { providers: unknown[] }).providers).toHaveLength(14);
+    expect((providers.json() as { providers: unknown[] }).providers).toHaveLength(15);
 
     const detail = await app.inject({ method: "GET", url: "/api/llm/v1/models/openrouter/moonshotai/kimi-k2.6" });
     expect(detail.statusCode).toBe(200);
@@ -126,7 +126,7 @@ describe("gatewayPlugin", () => {
     // OpenRouter's live /models list) and openrouter:xiaomi/mimo-v2-flash
     // (gone from the live list; the xiaomi-native route for the same family
     // stays) were both dropped as stale routes.
-    expect((response.json() as { models: unknown[] }).models).toHaveLength(141);
+    expect((response.json() as { models: unknown[] }).models).toHaveLength(146);
   });
 });
 

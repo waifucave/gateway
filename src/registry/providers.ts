@@ -1,6 +1,7 @@
 import { ProviderDef } from "./types.js";
 
 export const PROVIDERS: ProviderDef[] = [
+  { id: "meta", displayName: "Meta Model API", baseUrl: "https://api.meta.ai/v1", credentialEnv: "MODEL_API_KEY", wire: "openai-chat" },
   { id: "openrouter", displayName: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", credentialEnv: "OPENROUTER_API_KEY", wire: "openai-chat" },
   { id: "anthropic", displayName: "Anthropic", baseUrl: "https://api.anthropic.com", credentialEnv: "ANTHROPIC_API_KEY", wire: "anthropic-messages" },
   { id: "openai", displayName: "OpenAI", baseUrl: "https://api.openai.com/v1", credentialEnv: "OPENAI_API_KEY", wire: "openai-responses" },

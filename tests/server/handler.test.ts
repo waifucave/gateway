@@ -17,12 +17,12 @@ describe("envCredentials", () => {
 });
 
 describe("GET /v1/providers", () => {
-  it("lists all 14 providers with credential status", async () => {
+  it("lists all 15 providers with credential status", async () => {
     const handler = createGatewayHandler({ credentials: { deepseek: "sk-test", anthropic: "" } });
     const response = await get(handler, "/v1/providers");
     expect(response.status).toBe(200);
     const body = (await response.json()) as { providers: Array<Record<string, unknown>> };
-    expect(body.providers).toHaveLength(14);
+    expect(body.providers).toHaveLength(15);
     const deepseek = body.providers.find((p) => p.id === "deepseek");
     expect(deepseek).toEqual({
       id: "deepseek",
@@ -46,7 +46,7 @@ describe("GET /v1/providers", () => {
 });
 
 describe("GET /v1/models", () => {
-  it("returns all 141 routes with summary flags", async () => {
+  it("returns all 146 routes with summary flags", async () => {
     // 100 → 98 on 2026-07-02: openrouter/owl-alpha (whole family, gone from
     // OpenRouter's live /models list) and openrouter:xiaomi/mimo-v2-flash
     // (gone from the live list; the xiaomi-native route for the same family
@@ -55,7 +55,7 @@ describe("GET /v1/models", () => {
     const response = await get(handler, "/v1/models");
     expect(response.status).toBe(200);
     const body = (await response.json()) as { models: Array<Record<string, unknown>> };
-    expect(body.models).toHaveLength(141);
+    expect(body.models).toHaveLength(146);
     expect(body.models.find((m) => m.providerId === "deepseek" && m.modelId === "deepseek-v4-pro")).toEqual({
       providerId: "deepseek",
       modelId: "deepseek-v4-pro",
