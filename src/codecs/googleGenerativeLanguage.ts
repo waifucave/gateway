@@ -217,7 +217,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   let text = "";
   let reasoning = "";
   let reasoningSignature: string | undefined;
-  const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+  const toolCalls: Array<{ id: string; name: string; arguments: string; signature?: string }> = [];
 
   for await (const event of events) {
     let chunk: GooglePayload;
@@ -231,11 +231,14 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     for (const part of candidate?.content?.parts ?? []) {
       if (part.functionCall) {
         const index = toolCalls.length;
-        const call = {
+        // Gemini 3 puts the thoughtSignature on the functionCall part itself; it must
+        // round-trip on replay exactly like the non-streaming path (decodeParts).
+        const call = pruneUndefined({
           id: part.functionCall.id ?? `call_${index}`,
           name: part.functionCall.name ?? "",
-          arguments: JSON.stringify(part.functionCall.args ?? {})
-        };
+          arguments: JSON.stringify(part.functionCall.args ?? {}),
+          signature: part.thoughtSignature
+        });
         toolCalls.push(call);
         // functionCall parts arrive whole, so the delta carries the complete arguments JSON
         yield { type: "tool-call-delta", index, id: call.id, name: call.name, argumentsDelta: call.arguments };
@@ -267,7 +270,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     );
   }
   if (text !== "") content.push({ type: "text", text });
-  for (const call of toolCalls) content.push({ type: "toolCall", id: call.id, name: call.name, arguments: call.arguments });
+  for (const call of toolCalls) content.push(pruneUndefined({ type: "toolCall", id: call.id, name: call.name, arguments: call.arguments, signature: call.signature }));
   yield {
     type: "done",
     response: { id, provider: model.providerId, model: model.modelId, content, finishReason, usage, warnings: [] }
