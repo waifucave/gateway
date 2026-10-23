@@ -102,15 +102,19 @@ export const OPENROUTER_WIRE_NAMES: Record<string, string> = {
   verbosity: "verbosity",
   "reasoning.enabled": "reasoning.enabled",
   "reasoning.effort": "reasoning.effort",
-  "reasoning.budgetTokens": "reasoning.max_tokens",
-  "reasoning.exclude": "reasoning.exclude"
+  "reasoning.budgetTokens": "reasoning.max_tokens"
+  // reasoning.exclude is NOT forwarded: OpenRouter would then omit reasoning /
+  // reasoning_details, breaking signature round-trip on Claude/Gemini tool
+  // loops. The gateway hides reasoning itself (GATEWAY_SIDE_PARAMS).
 };
 
 export function mapOpenRouterParams(model: ResolvedModel, effectiveParams: Record<string, unknown>): MappedParams {
   const wire: Record<string, unknown> = {};
   const warnings: Warning[] = [];
   for (const [name, value] of Object.entries(effectiveParams)) {
-    if (value === undefined || DIRECTIVE_PARAMS.has(name)) continue;
+    // gateway-side params never go upstream on OpenRouter; reasoning.enabled /
+    // effort / budget still map, so reasoning stays on when the caller enabled it
+    if (value === undefined || DIRECTIVE_PARAMS.has(name) || GATEWAY_SIDE_PARAMS.has(name)) continue;
     const wireName = OPENROUTER_WIRE_NAMES[name];
     if (wireName === undefined) {
       warnings.push({ code: "unmapped_param", param: name, message: `${name} has no OpenRouter mapping; not sent` });
@@ -214,6 +218,14 @@ export function applyPassthrough(
     body[key] = scope && isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
     warnings.push({ code: "passthrough", param: key, message: `${key} sent unvalidated via passthrough` });
   }
+}
+
+/**
+ * `prompt_cache_key` is an OpenAI API field: only the OpenAI provider itself
+ * receives it (OpenRouter and other OpenAI-compatible providers do not document it).
+ */
+export function supportsPromptCacheKey(model: ResolvedModel): boolean {
+  return model.providerId === "openai";
 }
 
 /** System content as one string (wires without system block arrays). */

@@ -165,9 +165,15 @@ describe("prompt caching — OpenAI prompt_cache_key", () => {
     expect(JSON.stringify(encoded.body)).not.toContain("cache_control");
   });
 
-  it("openai-chat sends prompt_cache_key only for OpenAI models", () => {
-    expect(encodeWith(openaiChatCodec, "openrouter", "openai/gpt-5.5", [{ role: "user", content: "hi" }], "k1").body.prompt_cache_key).toBe("k1");
+  it("prompt_cache_key goes only to the OpenAI provider itself (not OpenRouter, not other openai-chat providers)", () => {
+    expect(encodeWith(openaiChatCodec, "openrouter", "openai/gpt-5.5", [{ role: "user", content: "hi" }], "k1").body).not.toHaveProperty("prompt_cache_key");
     expect(encodeWith(openaiChatCodec, "deepseek", "deepseek-v4-pro", [{ role: "user", content: "hi" }], "k1").body).not.toHaveProperty("prompt_cache_key");
+    // a responses-wire route on another provider (synthetic) must not get it either
+    const gpt = registry.resolve("openai", "gpt-5.5")!;
+    const foreign = { ...gpt, providerId: "someone-else" };
+    expect(openaiResponsesCodec.encode(foreign, { messages: [{ role: "user", content: "hi" }], effectiveParams: {}, stream: false, promptCacheKey: "k1" }, "K").body).not.toHaveProperty(
+      "prompt_cache_key"
+    );
   });
 });
 

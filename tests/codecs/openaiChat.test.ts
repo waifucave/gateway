@@ -102,6 +102,15 @@ describe("openai-chat encode — OpenRouter dialect", () => {
     expect(encoded.url).toBe("https://openrouter.ai/api/v1/chat/completions");
   });
 
+  it("reasoning.exclude stays gateway-side on OpenRouter so reasoning_details still come back for round-trip", () => {
+    const encoded = goldenEncode("openrouter", "anthropic/claude-sonnet-4.5", {
+      params: { "reasoning.enabled": true, "reasoning.exclude": true }
+    });
+    expect(encoded.body.reasoning).toEqual({ enabled: true });
+    expect(JSON.stringify(encoded.body)).not.toContain("exclude");
+    expect(encoded.warnings.filter((w) => w.code === "unmapped_param")).toEqual([]);
+  });
+
   it("GOLDEN: an Anthropic model via OpenRouter maps budgetTokens to reasoning.max_tokens", () => {
     const encoded = goldenEncode("openrouter", "anthropic/claude-fable-5", {
       params: { "reasoning.enabled": true, "reasoning.budgetTokens": 2000 }
@@ -480,6 +489,28 @@ describe("openai-chat decodeStream", () => {
     expect(done.response.content).toEqual([
       { type: "toolCall", id: "call_a", name: "first", arguments: "{}" },
       { type: "toolCall", id: "call_b", name: "second", arguments: '{"k":1}' }
+    ]);
+  });
+
+  it("splits parallel calls that reuse index 0 with distinct ids (Gemini OpenAI-compat)", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"first","arguments":"{\\"x\\":1}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_b","function":{"name":"second","arguments":"{\\"y\\":2}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":""}}]},"finish_reason":"tool_calls"}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const deltas = events.filter((e) => e.type === "tool-call-delta");
+    expect(deltas.map((d) => d.type === "tool-call-delta" && d.index)).toEqual([0, 1, 1]);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "toolCall", id: "call_a", name: "first", arguments: '{"x":1}' },
+      { type: "toolCall", id: "call_b", name: "second", arguments: '{"y":2}' }
     ]);
   });
 

@@ -4,7 +4,7 @@ import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
 import { normalizeUsage } from "../client/usage.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, pruneUndefined, setPath } from "./shared.js";
+import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, pruneUndefined, setPath, supportsPromptCacheKey } from "./shared.js";
 
 type ResponsesPayload = {
   id?: string;
@@ -68,7 +68,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
   body.input = encodeInput(request.messages);
   // OpenAI caches prefixes implicitly; cache markers are a no-op, the key routes requests to a shared cache.
-  if (request.promptCacheKey !== undefined) body.prompt_cache_key = request.promptCacheKey;
+  if (request.promptCacheKey !== undefined && supportsPromptCacheKey(model)) body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) =>
       pruneUndefined({ type: "function", name: tool.name, description: tool.description, parameters: tool.parameters, strict: tool.strict })

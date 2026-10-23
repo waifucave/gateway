@@ -25,6 +25,7 @@ import {
   mapNativeParams,
   mapOpenRouterParams,
   pruneUndefined,
+  supportsPromptCacheKey,
   systemText,
   wireCacheControl
 } from "./shared.js";
@@ -241,7 +242,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
   body.messages = encodeMessages(model, request.messages, warnings);
   // OpenAI routes cache automatically; prompt_cache_key steers requests sharing a prefix to the same cache.
-  if (request.promptCacheKey !== undefined && model.company === "OpenAI") body.prompt_cache_key = request.promptCacheKey;
+  if (request.promptCacheKey !== undefined && supportsPromptCacheKey(model)) body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) => ({
       type: "function",
@@ -322,9 +323,15 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   // continuation (no index, no id) belongs to the most recent call.
   const slotByIndex = new Map<number, number>();
   const slotById = new Map<string, number>();
+  // A known index with a DIFFERENT non-empty id is a new call: Gemini's
+  // OpenAI-compat layer sends every parallel call as index 0 with distinct ids.
   const toolCallSlot = (call: { index?: number; id?: string }): number => {
-    let slot = call.index !== undefined ? slotByIndex.get(call.index) : undefined;
-    if (slot === undefined && call.id) slot = slotById.get(call.id);
+    let slot = call.id ? slotById.get(call.id) : undefined;
+    if (slot === undefined && call.index !== undefined) {
+      const byIndex = slotByIndex.get(call.index);
+      const existingId = byIndex !== undefined ? toolCalls[byIndex]!.id : "";
+      if (byIndex !== undefined && !(call.id && existingId !== "" && existingId !== call.id)) slot = byIndex;
+    }
     if (slot === undefined && call.index === undefined && !call.id && toolCalls.length > 0) slot = toolCalls.length - 1;
     if (slot === undefined) {
       slot = toolCalls.length;
