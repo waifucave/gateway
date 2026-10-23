@@ -3,7 +3,7 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined } from "./shared.js";
+import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_THINKING_BUDGET = 1024;
@@ -84,13 +84,44 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): { system
   return { system: systems.length > 0 ? systems.join("\n\n") : undefined, messages: out };
 }
 
+/**
+ * Anthropic structured outputs accept a JSON-Schema subset: every object must
+ * be closed (`additionalProperties: false`) and numeric/length/array-size
+ * constraints are rejected. Close objects and move those constraints into the
+ * description (the official SDKs do the same), so callers keep one schema for
+ * every wire. Returns a deep copy — the caller's schema is never mutated.
+ */
+const UNSUPPORTED_SCHEMA_CONSTRAINTS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems"];
+
+function toAnthropicOutputSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map((entry) => toAnthropicOutputSchema(entry));
+  if (schema === null || typeof schema !== "object") return schema;
+  const source = schema as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const notes: string[] = [];
+  for (const [key, value] of Object.entries(source)) {
+    if (UNSUPPORTED_SCHEMA_CONSTRAINTS.includes(key) || (key === "minItems" && typeof value === "number" && value > 1)) {
+      notes.push(`${key}: ${JSON.stringify(value)}`);
+    } else if ((key === "properties" || key === "$defs" || key === "definitions") && value && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([name, sub]) => [name, toAnthropicOutputSchema(sub)]));
+    } else if (key === "items" || key === "anyOf" || key === "allOf" || key === "oneOf" || key === "prefixItems") {
+      out[key] = toAnthropicOutputSchema(value);
+    } else {
+      out[key] = structuredClone(value);
+    }
+  }
+  if (notes.length > 0) {
+    const note = `(${notes.join(", ")})`;
+    out.description = typeof out.description === "string" && out.description !== "" ? `${out.description} ${note}` : note;
+  }
+  const isObject = out.type === "object" || (Array.isArray(out.type) && out.type.includes("object")) || "properties" in out;
+  if (isObject && out.additionalProperties === undefined) out.additionalProperties = false;
+  return out;
+}
+
 function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): EncodedRequest {
-  if (request.responseFormat) {
-    throw new GatewayError(
-      "invalid_request",
-      "responseFormat is not implemented for the anthropic-messages codec; use tools for structured output",
-      { provider: model.providerId }
-    );
+  if (request.responseFormat?.type === "json_object") {
+    throw new GatewayError("invalid_request", "anthropic-messages has no JSON mode; use responseFormat json_schema", { provider: model.providerId });
   }
   const mapped = mapNativeParams(model, request.effectiveParams);
   const warnings = [...mapped.warnings];
@@ -134,6 +165,11 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
         : request.toolChoice === "required"
           ? { type: "any" }
           : { type: request.toolChoice };
+  }
+  if (request.responseFormat?.type === "json_schema") {
+    // Native structured outputs (GA, no beta header): output_config.format, merged
+    // with output_config.effort when both are set. The JSON arrives as the text block.
+    setPath(body, "output_config.format", { type: "json_schema", schema: toAnthropicOutputSchema(request.responseFormat.schema) });
   }
   if (request.stream) body.stream = true;
   applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });

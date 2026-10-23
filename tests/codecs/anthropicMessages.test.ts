@@ -279,7 +279,9 @@ describe("anthropic-messages encode — messages & tools", () => {
     expect(named.body.tool_choice).toEqual({ type: "tool", name: "pick" });
   });
 
-  it("throws invalid_request for responseFormat (not implemented on this wire)", () => {
+  it("throws invalid_request for json_object (Anthropic has no JSON mode; jsonMode is false in the catalog)", () => {
+    expect(model.features.structuredOutput.jsonMode).toBe(false);
+    expect(validateRequest(model, { params: {}, responseFormat: "json_object" }).ok).toBe(false);
     expect(() =>
       anthropicMessagesCodec.encode(
         model,
@@ -287,6 +289,78 @@ describe("anthropic-messages encode — messages & tools", () => {
         "TEST_KEY"
       )
     ).toThrow(GatewayError);
+  });
+
+  it("GOLDEN: json_schema → native output_config.format (G6), objects closed, unsupported constraints moved to descriptions", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        reply: { type: "string", maxLength: 200, description: "the reply" },
+        score: { type: "integer", minimum: 0, maximum: 10 },
+        tags: { type: "array", items: { type: "object", properties: { t: { type: "string" } }, required: ["t"] } }
+      },
+      required: ["reply", "score", "tags"]
+    };
+    const encoded = anthropicMessagesCodec.encode(
+      model,
+      { messages: [{ role: "user", content: "hi" }], responseFormat: { type: "json_schema", name: "decision", schema }, effectiveParams: {}, stream: false },
+      "TEST_KEY"
+    );
+    expect(encoded.body.output_config).toEqual({
+      format: {
+        type: "json_schema",
+        schema: {
+          type: "object",
+          properties: {
+            reply: { type: "string", description: "the reply (maxLength: 200)" },
+            score: { type: "integer", description: "(minimum: 0, maximum: 10)" },
+            tags: {
+              type: "array",
+              items: { type: "object", properties: { t: { type: "string" } }, required: ["t"], additionalProperties: false }
+            }
+          },
+          required: ["reply", "score", "tags"],
+          additionalProperties: false
+        }
+      }
+    });
+    expect(encoded.body).not.toHaveProperty("tools");
+    // the caller's schema object is never mutated
+    expect(schema.properties.reply).toEqual({ type: "string", maxLength: 200, description: "the reply" });
+  });
+
+  it("json_schema merges with effort inside output_config", () => {
+    const sonnet5 = registry.resolve("anthropic", "claude-sonnet-5")!;
+    const validation = validateRequest(sonnet5, { params: { "reasoning.effort": "low" }, responseFormat: "json_schema" });
+    expect(validation.ok, JSON.stringify(validation.violations)).toBe(true);
+    const encoded = anthropicMessagesCodec.encode(
+      sonnet5,
+      {
+        messages: [{ role: "user", content: "hi" }],
+        responseFormat: { type: "json_schema", schema: { type: "object", properties: {} } },
+        effectiveParams: validation.effectiveParams,
+        stream: false
+      },
+      "TEST_KEY"
+    );
+    expect(encoded.body.output_config).toEqual({
+      effort: "low",
+      format: { type: "json_schema", schema: { type: "object", properties: {}, additionalProperties: false } }
+    });
+  });
+
+  it("every Claude family that advertises jsonSchema encodes it without throwing", () => {
+    for (const ref of registry.listModels().filter((m) => m.providerId === "anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      expect(m.features.structuredOutput.jsonSchema).toBe(true);
+      expect(() =>
+        anthropicMessagesCodec.encode(
+          m,
+          { messages: [{ role: "user", content: "hi" }], responseFormat: { type: "json_schema", schema: { type: "object" } }, effectiveParams: {}, stream: false },
+          "K"
+        )
+      ).not.toThrow();
+    }
   });
 
   it("drops empty text blocks and empty turns (Anthropic rejects empty content)", () => {
