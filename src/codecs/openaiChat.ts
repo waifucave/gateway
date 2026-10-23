@@ -181,6 +181,23 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   let text = "";
   let reasoning = "";
   const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+  // Dense slot per streamed call. Providers key deltas by `index` (possibly
+  // sparse); some omit it and repeat the `id` instead — and a bare
+  // continuation (no index, no id) belongs to the most recent call.
+  const slotByIndex = new Map<number, number>();
+  const slotById = new Map<string, number>();
+  const toolCallSlot = (call: { index?: number; id?: string }): number => {
+    let slot = call.index !== undefined ? slotByIndex.get(call.index) : undefined;
+    if (slot === undefined && call.id) slot = slotById.get(call.id);
+    if (slot === undefined && call.index === undefined && !call.id && toolCalls.length > 0) slot = toolCalls.length - 1;
+    if (slot === undefined) {
+      slot = toolCalls.length;
+      toolCalls.push({ id: "", name: "", arguments: "" });
+    }
+    if (call.index !== undefined) slotByIndex.set(call.index, slot);
+    if (call.id) slotById.set(call.id, slot);
+    return slot;
+  };
 
   for await (const event of events) {
     if (event.data === "[DONE]") break;
@@ -208,8 +225,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       yield { type: "text-delta", text: delta.content };
     }
     for (const call of delta.tool_calls ?? []) {
-      const index = call.index ?? 0;
-      while (toolCalls.length <= index) toolCalls.push({ id: "", name: "", arguments: "" });
+      const index = toolCallSlot(call);
       const entry = toolCalls[index]!;
       if (call.id) entry.id = call.id;
       if (call.function?.name) entry.name = call.function.name;

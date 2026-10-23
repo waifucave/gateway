@@ -187,6 +187,37 @@ describe("gateway.stream", () => {
     if (events[0]!.type === "error") expect(events[0]!.error).toBeInstanceOf(GatewayError);
   });
 
+  it("aborts a stalled stream with a timeout error after streamIdleTimeoutMs without data (G11)", async () => {
+    let cancelled = false;
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"id":"c1","choices":[{"delta":{"content":"he"}}]}\n\n'));
+            // …and then nothing, forever
+          },
+          cancel() {
+            cancelled = true;
+          }
+        }),
+        { status: 200, headers: { "content-type": "text/event-stream" } }
+      )
+    );
+    const gateway = createGateway({ ...CREDS, fetchImpl, streamIdleTimeoutMs: 30 });
+    const started = Date.now();
+    const events = await collect(
+      gateway.stream({ provider: "deepseek", model: "deepseek-v4-pro", messages: [{ role: "user", content: "hi" }], params: { "reasoning.enabled": false } })
+    );
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(events.map((e) => e.type)).toEqual(["text-delta", "error"]);
+    const last = events.at(-1)!;
+    if (last.type === "error") {
+      expect(last.error.kind).toBe("timeout");
+      expect(last.error.message).toMatch(/stalled/);
+    }
+    expect(cancelled).toBe(true);
+  });
+
   it("throws (does not yield) for validation failures", async () => {
     const fetchImpl = vi.fn();
     const gateway = createGateway({ ...CREDS, fetchImpl });

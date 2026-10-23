@@ -5,7 +5,7 @@ import type { ConstraintWarning } from "../validate/constraints.js";
 import { codecFor } from "../codecs/index.js";
 import type { EncodedRequest } from "../codecs/types.js";
 import { fetchWithRetry } from "../transport/http.js";
-import { parseSse } from "../transport/sse.js";
+import { parseSse, withIdleTimeout } from "../transport/sse.js";
 import { GatewayError } from "../errors.js";
 import type { ChatRequest, ChatResponse, StreamEvent, Warning } from "./types.js";
 
@@ -20,7 +20,14 @@ export type GatewayOptions = {
   dataDir?: string;
   /** Attach the raw provider payload to ChatResponse.raw (non-streaming only). */
   includeRaw?: boolean;
+  /**
+   * stream(): abort with a `timeout` error when no bytes arrive for this long
+   * between chunks (stall guard; pings count as activity). Default 60s; 0 disables.
+   */
+  streamIdleTimeoutMs?: number;
 };
+
+const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 60_000;
 
 const WARNING_CODES = { dropped: "param_dropped", forced: "param_forced", clamped: "param_clamped" } as const;
 
@@ -95,10 +102,22 @@ export class Gateway {
    */
   async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
     const { model, encoded, warnings } = this.prepare(request, true);
+    // Own controller linked to the caller's signal so a stall can abort the
+    // upstream fetch/body without being mistaken for a user abort.
+    const upstream = new AbortController();
+    const onAbort = () => upstream.abort(request.signal?.reason);
+    if (request.signal?.aborted) onAbort();
+    else request.signal?.addEventListener("abort", onAbort, { once: true });
+    const idleMs = this.options.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS;
     try {
-      const response = await fetchWithRetry(model.providerId, encoded, this.transportOptions(request.signal));
+      const response = await fetchWithRetry(model.providerId, encoded, this.transportOptions(upstream.signal));
       if (!response.body) throw new GatewayError("server", `${model.providerId} returned no response body`, { provider: model.providerId });
-      for await (const event of codecFor(model.wire).decodeStream(model, parseSse(response.body))) {
+      const body = withIdleTimeout(response.body, idleMs, () => {
+        const error = new GatewayError("timeout", `${model.providerId} stream stalled: no data for ${idleMs}ms`, { provider: model.providerId });
+        upstream.abort(error);
+        return error;
+      });
+      for await (const event of codecFor(model.wire).decodeStream(model, parseSse(body))) {
         if (event.type === "done") event.response.warnings = [...warnings, ...event.response.warnings];
         yield event;
       }
@@ -107,6 +126,8 @@ export class Gateway {
         type: "error",
         error: cause instanceof GatewayError ? cause : new GatewayError("network", `stream failed: ${String(cause)}`, { provider: model.providerId, cause })
       };
+    } finally {
+      request.signal?.removeEventListener("abort", onAbort);
     }
   }
 

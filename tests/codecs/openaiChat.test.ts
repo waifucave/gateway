@@ -337,6 +337,44 @@ describe("openai-chat decodeStream", () => {
     }
   });
 
+  it("keys index-less tool-call deltas by id instead of merging them into call 0 (G11)", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"id":"call_a","function":{"name":"first","arguments":"{}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"id":"call_b","function":{"name":"second","arguments":"{\\"k\\""}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"function":{"arguments":":1}"}}]},"finish_reason":"tool_calls"}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const deltas = events.filter((e) => e.type === "tool-call-delta");
+    expect(deltas.map((d) => d.type === "tool-call-delta" && d.index)).toEqual([0, 1, 1]);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "toolCall", id: "call_a", name: "first", arguments: "{}" },
+      { type: "toolCall", id: "call_b", name: "second", arguments: '{"k":1}' }
+    ]);
+  });
+
+  it("maps sparse/out-of-order provider indexes onto dense positions", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":3,"id":"call_x","function":{"name":"x","arguments":"{}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":5,"id":"call_y","function":{"name":"y","arguments":"{}"}}]}}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content.map((b) => b.type === "toolCall" && b.id)).toEqual(["call_x", "call_y"]);
+  });
+
   it("throws GatewayError on malformed chunks", async () => {
     await expect(collect(openaiChatCodec.decodeStream(model, sse([{ data: "{not json" }])))).rejects.toThrow(GatewayError);
   });
