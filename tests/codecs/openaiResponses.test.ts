@@ -250,6 +250,42 @@ describe("openai-responses decodeStream", () => {
     expect(events[0]).toEqual({ type: "reasoning-delta", text: "hm" });
   });
 
+  it("treats response.incomplete as terminal: finishReason length/content_filter with usage (G4)", async () => {
+    for (const [reason, expected] of [["max_output_tokens", "length"], ["content_filter", "content_filter"]] as const) {
+      const events = await collect(
+        openaiResponsesCodec.decodeStream(
+          model,
+          sse([
+            { event: "response.created", data: JSON.stringify({ type: "response.created", response: { id: "resp_9" } }) },
+            { event: "response.output_text.delta", data: JSON.stringify({ type: "response.output_text.delta", output_index: 0, delta: "partial" }) },
+            {
+              event: "response.incomplete",
+              data: JSON.stringify({
+                type: "response.incomplete",
+                response: {
+                  id: "resp_9",
+                  status: "incomplete",
+                  incomplete_details: { reason },
+                  output: [{ type: "message", content: [{ type: "output_text", text: "partial" }] }],
+                  usage: { input_tokens: 12, output_tokens: 64 }
+                }
+              })
+            }
+          ])
+        )
+      );
+      const usage = events.find((e) => e.type === "usage");
+      expect(usage).toEqual({ type: "usage", usage: { inputTokens: 12, outputTokens: 64 } });
+      const done = events.at(-1);
+      expect(done?.type).toBe("done");
+      if (done?.type === "done") {
+        expect(done.response.finishReason).toBe(expected);
+        expect(done.response.content).toEqual([{ type: "text", text: "partial" }]);
+        expect(done.response.usage).toEqual({ inputTokens: 12, outputTokens: 64 });
+      }
+    }
+  });
+
   it("synthesizes a done event with finishReason error when the stream truncates before response.completed", async () => {
     const events = await collect(
       openaiResponsesCodec.decodeStream(

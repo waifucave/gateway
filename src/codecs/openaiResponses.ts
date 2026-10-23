@@ -186,7 +186,9 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
         if (entry) entry.arguments += data.delta;
         yield { type: "tool-call-delta", index, argumentsDelta: data.delta };
       }
-    } else if (type === "response.completed") {
+    } else if (type === "response.completed" || type === "response.incomplete") {
+      // response.incomplete is terminal too (max_output_tokens / content_filter):
+      // decodeResponse maps its status + incomplete_details to length / content_filter.
       const response = decodeResponse(model, data.response);
       yield { type: "usage", usage: response.usage };
       yield { type: "done", response };
