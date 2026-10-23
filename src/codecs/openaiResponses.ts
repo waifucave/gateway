@@ -3,6 +3,7 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, TextBlock, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
+import { normalizeUsage } from "../client/usage.js";
 import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, pruneUndefined, setPath } from "./shared.js";
 
 type ResponsesPayload = {
@@ -127,11 +128,12 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
             ? "content_filter"
             : "error"
         : "error";
-  const usage: Usage = pruneUndefined({
+  // Responses already reports totals: input includes cached, output includes reasoning.
+  const usage: Usage = normalizeUsage({
     inputTokens: wire.usage?.input_tokens ?? 0,
     outputTokens: wire.usage?.output_tokens ?? 0,
     reasoningTokens: wire.usage?.output_tokens_details?.reasoning_tokens,
-    cachedInputTokens: wire.usage?.input_tokens_details?.cached_tokens
+    cacheReadTokens: wire.usage?.input_tokens_details?.cached_tokens
   });
   return { id: wire.id ?? "", provider: model.providerId, model: model.modelId, content, finishReason, usage, warnings: [] };
 }

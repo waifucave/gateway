@@ -255,9 +255,41 @@ describe("openai-chat decodeResponse", () => {
         { type: "toolCall", id: "call_9", name: "pick", arguments: '{"k":1}' }
       ],
       finishReason: "tool_calls",
-      usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 3, cachedInputTokens: 4 },
+      usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 3, cacheReadTokens: 4, cachedInputTokens: 4 },
       warnings: []
     });
+  });
+
+  it("normalizes OpenRouter usage incl. cache writes, reasoning subset and reported cost (G10)", () => {
+    const orModel = registry.resolve("openrouter", "anthropic/claude-sonnet-4.5")!;
+    const response = openaiChatCodec.decodeResponse(orModel, {
+      choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 20,
+        prompt_tokens_details: { cached_tokens: 80, cache_write_tokens: 10 },
+        completion_tokens_details: { reasoning_tokens: 5 },
+        cost: 0.0012
+      }
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      reasoningTokens: 5,
+      cacheReadTokens: 80,
+      cacheWriteTokens: 10,
+      cachedInputTokens: 80,
+      costUsd: 0.0012
+    });
+  });
+
+  it("reads Moonshot's top-level cached_tokens", () => {
+    const kimi = registry.resolve("moonshot", "kimi-k2.6")!;
+    const response = openaiChatCodec.decodeResponse(kimi, {
+      choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 50, completion_tokens: 2, cached_tokens: 40 }
+    });
+    expect(response.usage).toMatchObject({ inputTokens: 50, cacheReadTokens: 40 });
   });
 
   it("maps finish reasons, defaulting unknown ones to error", () => {

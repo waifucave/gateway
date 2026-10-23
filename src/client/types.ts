@@ -58,11 +58,30 @@ export type ChatRequest = {
 
 export type FinishReason = "stop" | "length" | "tool_calls" | "content_filter" | "error";
 
+/**
+ * ONE convention for every provider:
+ * - `inputTokens` = the WHOLE prompt, including cache reads and cache writes
+ *   (Anthropic's input_tokens + cache_read + cache_creation; OpenAI/Gemini/
+ *   OpenRouter already report the total).
+ * - `outputTokens` = all generated tokens, INCLUDING reasoning (Gemini's
+ *   candidates + thoughts).
+ * - `cacheReadTokens` / `cacheWriteTokens` / `cacheWrite1hTokens` and
+ *   `reasoningTokens` are SUBSETS of the above, never added on top; absent when
+ *   the provider does not report them.
+ * - `costUsd`: OpenRouter's reported `usage.cost`, else computed from catalog
+ *   pricing (see computeCostUsd); absent when pricing is unknown.
+ */
 export type Usage = {
   inputTokens: number;
   outputTokens: number;
   reasoningTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  /** Part of cacheWriteTokens written with the 1-hour TTL (Anthropic). */
+  cacheWrite1hTokens?: number;
+  /** @deprecated alias of `cacheReadTokens`, kept for 0.3.x consumers. */
   cachedInputTokens?: number;
+  costUsd?: number;
 };
 
 export type Warning = {

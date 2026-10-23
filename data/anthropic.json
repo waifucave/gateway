@@ -24,7 +24,9 @@
           "pricing": {
             "inputPerMTok": 1,
             "outputPerMTok": 5,
-            "cachedInputPerMTok": 0.1
+            "cachedInputPerMTok": 0.1,
+            "cacheWritePerMTok": 1.25,
+            "cacheWrite1hPerMTok": 2
           },
           "modalities": [
             "text",
@@ -187,7 +189,9 @@
       "pricing": {
         "inputPerMTok": 1,
         "outputPerMTok": 5,
-        "cachedInputPerMTok": 0.1
+        "cachedInputPerMTok": 0.1,
+        "cacheWritePerMTok": 1.25,
+        "cacheWrite1hPerMTok": 2
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -228,7 +232,9 @@
           "pricing": {
             "inputPerMTok": 3,
             "outputPerMTok": 15,
-            "cachedInputPerMTok": 0.3
+            "cachedInputPerMTok": 0.3,
+            "cacheWritePerMTok": 3.75,
+            "cacheWrite1hPerMTok": 6
           },
           "modalities": [
             "text",
@@ -391,7 +397,9 @@
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -432,7 +440,9 @@
           "pricing": {
             "inputPerMTok": 3,
             "outputPerMTok": 15,
-            "cachedInputPerMTok": 0.3
+            "cachedInputPerMTok": 0.3,
+            "cacheWritePerMTok": 3.75,
+            "cacheWrite1hPerMTok": 6
           },
           "modalities": [
             "text",
@@ -597,7 +607,9 @@
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -638,7 +650,9 @@
           "pricing": {
             "inputPerMTok": 2,
             "outputPerMTok": 10,
-            "cachedInputPerMTok": 0.2
+            "cachedInputPerMTok": 0.2,
+            "cacheWritePerMTok": 2.5,
+            "cacheWrite1hPerMTok": 4
           },
           "modalities": [
             "text",
@@ -748,7 +762,9 @@
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,
@@ -793,7 +809,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -958,7 +976,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -999,7 +1019,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -1106,7 +1128,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -1147,7 +1171,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -1182,7 +1208,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1292,7 +1320,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,
@@ -1337,7 +1367,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -1372,7 +1404,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1508,7 +1542,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "2026-05",
       "deprecated": false,
@@ -1553,7 +1589,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1662,7 +1700,9 @@
       "pricing": {
         "inputPerMTok": 10,
         "outputPerMTok": 50,
-        "cachedInputPerMTok": 1
+        "cachedInputPerMTok": 1,
+        "cacheWritePerMTok": 12.5,
+        "cacheWrite1hPerMTok": 20
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,

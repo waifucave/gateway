@@ -208,7 +208,8 @@ describe("google decodeResponse", () => {
         { type: "toolCall", id: "call_0", name: "lookup", arguments: '{"q":"x"}' }
       ],
       finishReason: "tool_calls", // STOP + functionCall present
-      usage: { inputTokens: 8, outputTokens: 4, reasoningTokens: 2, cachedInputTokens: 3 },
+      // outputTokens includes thoughts: candidates 4 + thoughts 2 (G10)
+      usage: { inputTokens: 8, outputTokens: 6, reasoningTokens: 2, cacheReadTokens: 3, cachedInputTokens: 3 },
       warnings: []
     });
   });

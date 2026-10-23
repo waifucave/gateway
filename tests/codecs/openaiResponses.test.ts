@@ -144,7 +144,7 @@ describe("openai-responses decodeResponse", () => {
         { type: "toolCall", id: "call_2", name: "pick", arguments: "{}" }
       ],
       finishReason: "tool_calls",
-      usage: { inputTokens: 20, outputTokens: 9, reasoningTokens: 6, cachedInputTokens: 11 },
+      usage: { inputTokens: 20, outputTokens: 9, reasoningTokens: 6, cacheReadTokens: 11, cachedInputTokens: 11 },
       warnings: []
     });
   });

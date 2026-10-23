@@ -3,6 +3,7 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, ToolCallBlock, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
+import { normalizeUsage } from "../client/usage.js";
 import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
@@ -176,12 +177,13 @@ function decodeParts(parts: GooglePart[], toolStartIndex: number): { blocks: Con
   return { blocks, toolCount };
 }
 
+/** promptTokenCount already includes cached content; candidatesTokenCount EXCLUDES thoughts, so output adds them back. */
 function decodeUsage(meta: GooglePayload["usageMetadata"]): Usage {
-  return pruneUndefined({
+  return normalizeUsage({
     inputTokens: meta?.promptTokenCount ?? 0,
-    outputTokens: meta?.candidatesTokenCount ?? 0,
+    outputTokens: (meta?.candidatesTokenCount ?? 0) + (meta?.thoughtsTokenCount ?? 0),
     reasoningTokens: meta?.thoughtsTokenCount,
-    cachedInputTokens: meta?.cachedContentTokenCount
+    cacheReadTokens: meta?.cachedContentTokenCount
   });
 }
 

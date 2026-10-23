@@ -400,8 +400,31 @@ describe("anthropic-messages decodeResponse", () => {
         { type: "toolCall", id: "toolu_9", name: "lookup", arguments: '{"q":"x"}' }
       ],
       finishReason: "tool_calls",
-      usage: { inputTokens: 12, outputTokens: 7, cachedInputTokens: 5 },
+      // inputTokens = uncached 12 + cache read 5 (total prompt, G10)
+      usage: { inputTokens: 17, outputTokens: 7, cacheReadTokens: 5, cachedInputTokens: 5 },
       warnings: []
+    });
+  });
+
+  it("normalizes usage: input = input_tokens + cache_read + cache_creation; 1h writes broken out (G10)", () => {
+    const response = anthropicMessagesCodec.decodeResponse(model, {
+      stop_reason: "end_turn",
+      content: [],
+      usage: {
+        input_tokens: 10,
+        cache_read_input_tokens: 100,
+        cache_creation_input_tokens: 20,
+        cache_creation: { ephemeral_5m_input_tokens: 5, ephemeral_1h_input_tokens: 15 },
+        output_tokens: 7
+      }
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 130,
+      outputTokens: 7,
+      cacheReadTokens: 100,
+      cacheWriteTokens: 20,
+      cacheWrite1hTokens: 15,
+      cachedInputTokens: 100
     });
   });
 
@@ -465,6 +488,31 @@ describe("anthropic-messages decodeStream", () => {
         }
       }
     ]);
+  });
+
+  it("stream usage sums cache reads/writes into inputTokens and prefers message_delta's cumulative counts", async () => {
+    const events = await collect(
+      anthropicMessagesCodec.decodeStream(
+        model,
+        sse([
+          {
+            event: "message_start",
+            data: '{"type":"message_start","message":{"id":"m","usage":{"input_tokens":4,"cache_read_input_tokens":50,"cache_creation_input_tokens":6,"output_tokens":1}}}'
+          },
+          { event: "content_block_start", data: '{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' },
+          { event: "content_block_delta", data: '{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}}' },
+          {
+            event: "message_delta",
+            data: '{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":4,"cache_read_input_tokens":50,"cache_creation_input_tokens":6,"output_tokens":12}}'
+          },
+          { event: "message_stop", data: '{"type":"message_stop"}' }
+        ])
+      )
+    );
+    expect(events.find((e) => e.type === "usage")).toEqual({
+      type: "usage",
+      usage: { inputTokens: 60, outputTokens: 12, cacheReadTokens: 50, cacheWriteTokens: 6, cachedInputTokens: 50 }
+    });
   });
 
   it("synthesizes a done event when the stream truncates before message_stop", async () => {

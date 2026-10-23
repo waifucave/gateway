@@ -13,6 +13,7 @@ import type {
 } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
+import { normalizeUsage } from "../client/usage.js";
 import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, mapOpenRouterParams, pruneUndefined } from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
@@ -23,12 +24,19 @@ const FINISH_REASONS: Record<string, FinishReason> = {
 };
 
 type WireUsage = {
+  /** Total prompt tokens (cached included) on every OpenAI-compatible provider. */
   prompt_tokens?: number;
+  /** Total completion tokens (reasoning included). */
   completion_tokens?: number;
   completion_tokens_details?: { reasoning_tokens?: number };
-  prompt_tokens_details?: { cached_tokens?: number };
+  /** OpenRouter adds cache_write_tokens next to OpenAI's cached_tokens. */
+  prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
   /** DeepSeek's cache-hit counter. */
   prompt_cache_hit_tokens?: number;
+  /** Moonshot's cache-hit counter. */
+  cached_tokens?: number;
+  /** OpenRouter: USD charged for this generation. */
+  cost?: number;
 };
 
 type ReasoningDetail = Record<string, unknown>;
@@ -66,11 +74,13 @@ type StreamChunk = {
 };
 
 function decodeUsage(usage: WireUsage | null | undefined): Usage {
-  return pruneUndefined({
+  return normalizeUsage({
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
-    cachedInputTokens: usage?.prompt_tokens_details?.cached_tokens ?? usage?.prompt_cache_hit_tokens
+    cacheReadTokens: usage?.prompt_tokens_details?.cached_tokens ?? usage?.prompt_cache_hit_tokens ?? usage?.cached_tokens,
+    cacheWriteTokens: usage?.prompt_tokens_details?.cache_write_tokens,
+    costUsd: usage?.cost
   });
 }
 

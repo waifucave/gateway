@@ -3,6 +3,7 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
+import { normalizeUsage } from "../client/usage.js";
 import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
@@ -29,8 +30,29 @@ type AnthropicPayload = {
     name?: string;
     input?: unknown;
   }>;
-  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number };
+  usage?: WireUsage;
 };
+
+type WireUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number };
+};
+
+/** Anthropic's input_tokens is the UNCACHED remainder only — the normalized total adds reads and writes back. */
+function decodeUsage(usage: WireUsage | undefined): Usage {
+  const cacheRead = usage?.cache_read_input_tokens;
+  const cacheWrite = usage?.cache_creation_input_tokens;
+  return normalizeUsage({
+    inputTokens: (usage?.input_tokens ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0),
+    outputTokens: usage?.output_tokens ?? 0,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+    cacheWrite1hTokens: usage?.cache_creation?.ephemeral_1h_input_tokens
+  });
+}
 
 function defaultMaxTokens(model: ResolvedModel): number {
   return model.limits.maxOutputTokens > 0 ? Math.min(model.limits.maxOutputTokens, DEFAULT_MAX_TOKENS) : DEFAULT_MAX_TOKENS;
@@ -194,11 +216,7 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
       content.push({ type: "toolCall", id: block.id ?? `call_${index}`, name: block.name ?? "", arguments: JSON.stringify(block.input ?? {}) });
     }
   });
-  const usage: Usage = pruneUndefined({
-    inputTokens: wire.usage?.input_tokens ?? 0,
-    outputTokens: wire.usage?.output_tokens ?? 0,
-    cachedInputTokens: wire.usage?.cache_read_input_tokens
-  });
+  const usage = decodeUsage(wire.usage);
   return {
     id: wire.id ?? "",
     provider: model.providerId,
@@ -231,9 +249,9 @@ function assembleContent(blocks: Map<number, StreamBlock>): ContentBlock[] {
 async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEvent>): AsyncGenerator<StreamEvent> {
   let id = "";
   let finishReason: FinishReason = "error";
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cachedInputTokens: number | undefined;
+  // message_start carries the prompt counts; message_delta's usage is cumulative
+  // (and on newer API versions repeats the input/cache fields) — merge, later wins.
+  let wireUsage: WireUsage = {};
   const blocks = new Map<number, StreamBlock>();
   let nextToolIndex = 0;
 
@@ -248,8 +266,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     const type = event.event ?? (data.type as string | undefined);
     if (type === "message_start") {
       id = (data.message as Record<string, unknown> | undefined)?.id as string ?? "";
-      inputTokens = ((data.message as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined)?.input_tokens as number ?? 0;
-      cachedInputTokens = ((data.message as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined)?.cache_read_input_tokens as number | undefined;
+      wireUsage = { ...wireUsage, ...(((data.message as Record<string, unknown> | undefined)?.usage ?? {}) as WireUsage) };
     } else if (type === "content_block_start") {
       const index = data.index as number;
       const block = (data.content_block ?? {}) as Record<string, unknown>;
@@ -291,9 +308,11 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       const delta = (data.delta ?? {}) as Record<string, unknown>;
       if (typeof delta.stop_reason === "string") finishReason = STOP_REASONS[delta.stop_reason] ?? "error";
       const usageData = (data.usage ?? {}) as Record<string, unknown>;
-      if (typeof usageData.output_tokens === "number") outputTokens = usageData.output_tokens;
+      for (const [key, value] of Object.entries(usageData)) {
+        if (value !== null && value !== undefined) (wireUsage as Record<string, unknown>)[key] = value;
+      }
     } else if (type === "message_stop") {
-      const usage: Usage = pruneUndefined({ inputTokens, outputTokens, cachedInputTokens });
+      const usage = decodeUsage(wireUsage);
       yield { type: "usage", usage };
       yield {
         type: "done",
@@ -317,7 +336,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       model: model.modelId,
       content: assembleContent(blocks),
       finishReason,
-      usage: pruneUndefined({ inputTokens, outputTokens, cachedInputTokens }),
+      usage: decodeUsage(wireUsage),
       warnings: []
     }
   };

@@ -7,6 +7,7 @@ import type { EncodedRequest } from "../codecs/types.js";
 import { fetchWithRetry } from "../transport/http.js";
 import { parseSse, withIdleTimeout } from "../transport/sse.js";
 import { GatewayError } from "../errors.js";
+import { withCost } from "./usage.js";
 import type { ChatRequest, ChatResponse, ContentBlock, StreamEvent, Warning } from "./types.js";
 
 export type GatewayOptions = {
@@ -119,6 +120,7 @@ export class Gateway {
     const decoded = codecFor(model.wire).decodeResponse(model, payload);
     decoded.warnings = [...warnings, ...decoded.warnings];
     if (excludeReasoning) decoded.content = hideReasoning(decoded.content);
+    withCost(model, decoded.usage);
     if (this.options.includeRaw) decoded.raw = payload;
     return decoded;
   }
@@ -147,7 +149,9 @@ export class Gateway {
       });
       for await (const event of codecFor(model.wire).decodeStream(model, parseSse(body))) {
         if (excludeReasoning && event.type === "reasoning-delta") continue;
+        if (event.type === "usage") withCost(model, event.usage);
         if (event.type === "done") {
+          withCost(model, event.response.usage);
           event.response.warnings = [...warnings, ...event.response.warnings];
           if (excludeReasoning) event.response.content = hideReasoning(event.response.content);
         }

@@ -50,7 +50,9 @@ const PricingSchema = z
   .object({
     inputPerMTok: z.number().nullable().optional(),
     outputPerMTok: z.number().nullable().optional(),
-    cachedInputPerMTok: z.number().nullable().optional()
+    cachedInputPerMTok: z.number().nullable().optional(),
+    cacheWritePerMTok: z.number().nullable().optional(),
+    cacheWrite1hPerMTok: z.number().nullable().optional()
   })
   .strict();
 
