@@ -443,6 +443,8 @@ describe("anthropic-messages decodeResponse", () => {
     expect(stop("end_turn")).toBe("stop");
     expect(stop("stop_sequence")).toBe("stop");
     expect(stop("max_tokens")).toBe("length");
+    // generation ran into the context window: a token limit, not an error
+    expect(stop("model_context_window_exceeded")).toBe("length");
   });
 });
 
