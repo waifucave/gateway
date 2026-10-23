@@ -31,12 +31,18 @@ type WireUsage = {
   prompt_cache_hit_tokens?: number;
 };
 
+type ReasoningDetail = Record<string, unknown>;
+
 type WirePayload = {
   id?: string;
   choices?: Array<{
     message?: {
       content?: string | null;
       reasoning_content?: string | null;
+      /** OpenRouter's normalized reasoning text. */
+      reasoning?: string | null;
+      /** OpenRouter's structured reasoning (text/summary/encrypted, with signatures). */
+      reasoning_details?: ReasoningDetail[] | null;
       tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
     };
     finish_reason?: string | null;
@@ -51,6 +57,8 @@ type StreamChunk = {
     delta?: {
       content?: string | null;
       reasoning_content?: string | null;
+      reasoning?: string | null;
+      reasoning_details?: ReasoningDetail[] | null;
       tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }>;
     };
     finish_reason?: string | null;
@@ -66,7 +74,46 @@ function decodeUsage(usage: WireUsage | null | undefined): Usage {
   });
 }
 
+/** Readable text carried by reasoning_details when no plain `reasoning` string accompanies them. */
+function detailsText(details: ReasoningDetail[]): string {
+  return details
+    .map((detail) => (typeof detail.text === "string" ? detail.text : typeof detail.summary === "string" ? detail.summary : ""))
+    .join("");
+}
+
+/**
+ * Merge streamed reasoning_details fragments: fragments sharing an `index`
+ * (and type) belong to one detail — string payload fields concatenate,
+ * everything else is last-write-wins. Fragments without an index append.
+ */
+function mergeDetails(into: ReasoningDetail[], fragments: ReasoningDetail[]): void {
+  for (const fragment of fragments) {
+    if (fragment === null || typeof fragment !== "object") continue;
+    const existing =
+      typeof fragment.index === "number"
+        ? into.find((d) => d.index === fragment.index && (fragment.type === undefined || d.type === fragment.type))
+        : undefined;
+    if (!existing) {
+      into.push({ ...fragment });
+      continue;
+    }
+    for (const [key, value] of Object.entries(fragment)) {
+      if (["text", "summary", "data", "signature"].includes(key) && typeof value === "string" && typeof existing[key] === "string") {
+        existing[key] = (existing[key] as string) + value;
+      } else if (value !== undefined && value !== null) {
+        existing[key] = value;
+      }
+    }
+  }
+}
+
+function reasoningBlock(text: string, details: ReasoningDetail[]): ReasoningBlock | undefined {
+  if (text === "" && details.length === 0) return undefined;
+  return details.length > 0 ? { type: "reasoning", text, details } : { type: "reasoning", text };
+}
+
 function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Record<string, unknown>> {
+  const openrouter = model.providerId === "openrouter";
   const out: Array<Record<string, unknown>> = [];
   for (const message of messages) {
     if (message.role === "system") {
@@ -91,8 +138,15 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Re
       // Text blocks are joined into the single wire `content` string; text/toolCall
       // interleaving cannot be represented on this wire and is intentionally lost.
       const text = message.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("");
-      const reasoning = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning").map((b) => b.text).join("");
+      const reasoningBlocks = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning");
+      const reasoning = reasoningBlocks.map((b) => b.text).join("");
+      const details = reasoningBlocks.flatMap((b) => b.details ?? []);
       const toolCalls = message.content.filter((b): b is ToolCallBlock => b.type === "toolCall");
+      // OpenRouter: replay reasoning_details verbatim (carries Anthropic signatures /
+      // Gemini thought signatures / OpenAI encrypted reasoning) on tool-call turns,
+      // or on any turn when the family requires reasoning round-trip. Native
+      // routes keep the DeepSeek-style reasoning_content field.
+      const replay = toolCalls.length > 0 || model.features.reasoningRoundTrip === true;
       out.push(
         pruneUndefined({
           role: "assistant",
@@ -101,7 +155,10 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Re
           tool_calls: toolCalls.length
             ? toolCalls.map((call) => ({ id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } }))
             : undefined,
-          reasoning_content: reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined
+          reasoning_details: openrouter && replay && details.length > 0 ? details : undefined,
+          reasoning:
+            openrouter && details.length === 0 && reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined,
+          reasoning_content: !openrouter && reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined
         })
       );
     }
@@ -154,9 +211,15 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
   }
   const message = choice.message ?? {};
   const content: ContentBlock[] = [];
-  if (typeof message.reasoning_content === "string" && message.reasoning_content !== "") {
-    content.push({ type: "reasoning", text: message.reasoning_content });
-  }
+  const details = Array.isArray(message.reasoning_details) ? message.reasoning_details.filter((d) => d !== null && typeof d === "object") : [];
+  const reasoningText =
+    typeof message.reasoning_content === "string" && message.reasoning_content !== ""
+      ? message.reasoning_content
+      : typeof message.reasoning === "string" && message.reasoning !== ""
+        ? message.reasoning
+        : detailsText(details);
+  const reasoning = reasoningBlock(reasoningText, details);
+  if (reasoning) content.push(reasoning);
   if (typeof message.content === "string" && message.content !== "") {
     content.push({ type: "text", text: message.content });
   }
@@ -180,6 +243,8 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   let usage: Usage = { inputTokens: 0, outputTokens: 0 };
   let text = "";
   let reasoning = "";
+  let sawReasoningString = false;
+  const details: ReasoningDetail[] = [];
   const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
   // Dense slot per streamed call. Providers key deltas by `index` (possibly
   // sparse); some omit it and repeat the `id` instead — and a bare
@@ -216,9 +281,23 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     if (!choice) continue;
     if (choice.finish_reason) finishReason = FINISH_REASONS[choice.finish_reason] ?? "error";
     const delta = choice.delta ?? {};
-    if (typeof delta.reasoning_content === "string" && delta.reasoning_content !== "") {
-      reasoning += delta.reasoning_content;
-      yield { type: "reasoning-delta", text: delta.reasoning_content };
+    // DeepSeek spells it reasoning_content; OpenRouter re-exports the same channel as
+    // `reasoning` (plus structured reasoning_details, kept for round-trip). Deltas come
+    // from the strings; details only contribute text when no string channel exists.
+    const reasoningDelta =
+      typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : undefined;
+    if (reasoningDelta !== undefined) sawReasoningString = true;
+    if (reasoningDelta) {
+      reasoning += reasoningDelta;
+      yield { type: "reasoning-delta", text: reasoningDelta };
+    }
+    if (Array.isArray(delta.reasoning_details) && delta.reasoning_details.length > 0) {
+      mergeDetails(details, delta.reasoning_details);
+      const fragmentText = detailsText(delta.reasoning_details);
+      if (!sawReasoningString && fragmentText !== "") {
+        reasoning += fragmentText;
+        yield { type: "reasoning-delta", text: fragmentText };
+      }
     }
     if (typeof delta.content === "string" && delta.content !== "") {
       text += delta.content;
@@ -242,7 +321,8 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   }
 
   const content: ContentBlock[] = [];
-  if (reasoning !== "") content.push({ type: "reasoning", text: reasoning });
+  const reasoningOut = reasoningBlock(reasoning, details);
+  if (reasoningOut) content.push(reasoningOut);
   if (text !== "") content.push({ type: "text", text });
   toolCalls.forEach((call, index) => {
     content.push({ type: "toolCall", id: call.id || `call_${index}`, name: call.name, arguments: call.arguments || "{}" });

@@ -7,9 +7,19 @@ export type ImageBlock = { type: "image"; mimeType: string; data: string };
 
 /**
  * Opaque reasoning content. `signature` (Anthropic) must round-trip on tool loops;
- * `redacted` + `data` carry Anthropic redacted_thinking blocks.
+ * `redacted` + `data` carry Anthropic redacted_thinking blocks; `details` carries
+ * OpenRouter's `reasoning_details` array verbatim (signatures / encrypted
+ * reasoning) and is replayed on OpenRouter routes. Pass reasoning blocks back
+ * unchanged on tool loops — the codecs decide what each wire needs.
  */
-export type ReasoningBlock = { type: "reasoning"; text: string; signature?: string; redacted?: boolean; data?: string };
+export type ReasoningBlock = {
+  type: "reasoning";
+  text: string;
+  signature?: string;
+  redacted?: boolean;
+  data?: string;
+  details?: Array<Record<string, unknown>>;
+};
 
 /** `arguments` is the raw JSON text of the call arguments (consumers parse it; codecs that need objects parse internally). */
 // signature: Gemini 3 thoughtSignature captured at decode; round-tripped on replay (other providers ignore it).

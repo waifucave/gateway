@@ -110,6 +110,9 @@ function validateContentBlock(block: unknown, messageIndex: number, blockIndex: 
       if (block.signature !== undefined && typeof block.signature !== "string") return `${prefix}: reasoning block "signature" must be a string`;
       if (block.redacted !== undefined && typeof block.redacted !== "boolean") return `${prefix}: reasoning block "redacted" must be a boolean`;
       if (block.data !== undefined && typeof block.data !== "string") return `${prefix}: reasoning block "data" must be a string`;
+      if (block.details !== undefined && (!Array.isArray(block.details) || block.details.some((d) => !isPlainObject(d)))) {
+        return `${prefix}: reasoning block "details" must be an array of objects`;
+      }
       return undefined;
     case "toolCall":
       if (typeof block.id !== "string" || block.id === "") return `${prefix}: toolCall block requires an "id"`;
