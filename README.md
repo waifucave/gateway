@@ -83,12 +83,17 @@ each codec owns (`model`, `messages`/`input`/`contents`, `system`, `tools`,
 `tool_choice`, `stream`, `response_format`, …) are rejected with
 `invalid_request` — see `CORE_BODY_KEYS`.
 
-**`reasoning.exclude`** hides reasoning text gateway-side (no `reasoning-delta`
-events, empty `text` on reasoning blocks). Signed thinking must replay
-unmodified, so the original text moves to the opaque `replay` field (never
-display it) and signatures / redacted data / OpenRouter `details` stay as-is.
-On OpenRouter it is also sent as `reasoning.exclude`. Pass reasoning blocks
-back unchanged on tool loops.
+**`reasoning.exclude` hides reasoning from display only — it is NOT a privacy
+feature.** The gateway emits no `reasoning-delta` events and empties `text` on
+reasoning blocks, but signed thinking must replay unmodified, so the original
+text is still carried in `ReasoningBlock.replay` (and OpenRouter `details`,
+signatures, redacted data stay as-is; the raw provider payload with
+`includeRaw` contains it too). Never display `replay`; pass reasoning blocks
+back unchanged on tool loops. The flag is applied gateway-side on every route —
+it is not forwarded to OpenRouter, which would otherwise stop returning the
+`reasoning_details` needed for round-trip. Unsigned reasoning blocks (e.g. from
+another provider after a model switch) are dropped with a `content_dropped`
+warning when replayed to Anthropic.
 
 ### Usage and cost
 
@@ -133,7 +138,7 @@ marks one block (system content may be `TextBlock[]`). Per wire:
 | Anthropic | `cache_control` on the marked block (never on thinking blocks); max 4 — the earliest extras are dropped with a `cache_ignored` warning; a 1h breakpoint after a 5m one is downgraded |
 | OpenRouter → Anthropic / Gemini models | `cache_control` on content parts (string content becomes a one-part array) |
 | OpenRouter → other models, native OpenAI-compatible providers | markers ignored (implicit caching) |
-| OpenAI Responses, OpenAI models on openai-chat | `prompt_cache_key` = `promptCacheKey`; markers ignored |
+| OpenAI (provider `openai`) | `prompt_cache_key` = `promptCacheKey`; markers ignored (no other provider/route receives the key) |
 | Google | no-op (implicit caching) |
 
 `features.promptCaching.kind` (also `promptCaching` in `/v1/models`) says which
@@ -151,7 +156,10 @@ Gemini per-day quota), `billing` (HTTP 402, credit balance too low),
 retry decision and never retried.
 
 **Streams** abort with a `timeout` error event when no bytes arrive for
-`streamIdleTimeoutMs` (default 60 000; `0` disables). Finish reasons:
+`streamIdleTimeoutMs`. Default 60 s, or 180 s when the request reasons
+(`reasoning.enabled`, a `reasoning.effort` other than `none`, or an always-on
+thinking model) since hidden high-effort reasoning can stream nothing for
+minutes. An explicit value applies to every stream; `0` disables. Finish reasons:
 `stop`, `length` (token limit — including OpenAI `response.incomplete`),
 `tool_calls`, `content_filter`, `error`.
 
@@ -210,7 +218,7 @@ Streaming responses (`POST /v1/chat` with `stream: true`) use Server-Sent Events
 - Each frame: `data: <StreamEvent JSON>\n\n`
 - Error events carry serialized `GatewayError` objects (kind, message, provider, retryable)
 - Stream ends with `data: [DONE]\n\n`
-- `timeoutMs` bounds time-to-first-headers only; long streams are not cut off, but a stream that stalls (no bytes for `streamIdleTimeoutMs`, default 60s) ends with a `timeout` error event
+- `timeoutMs` bounds time-to-first-headers only; long streams are not cut off, but a stream that stalls (no bytes for `streamIdleTimeoutMs`, default 60s / 180s when reasoning) ends with a `timeout` error event
 
 ### Error status codes
 
