@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGateway } from "../../src/client/gateway.js";
+import { createGateway, streamIdleTimeoutFor } from "../../src/client/gateway.js";
+import { Registry } from "../../src/registry/loader.js";
 import { GatewayError } from "../../src/errors.js";
 import type { StreamEvent } from "../../src/client/types.js";
 
@@ -334,6 +335,28 @@ describe("gateway.stream", () => {
       collect(gateway.stream({ provider: "deepseek", model: "deepseek-v4-pro", messages: [], toolChoice: "required" }))
     ).rejects.toMatchObject({ kind: "unsupported_parameter" });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("streamIdleTimeoutFor (stall-guard defaults)", () => {
+  const registry = Registry.load();
+  const deepseek = registry.resolve("deepseek", "deepseek-v4-pro")!;
+  const fable = registry.resolve("anthropic", "claude-fable-5")!;
+  const haiku = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+
+  it("defaults to 60s without reasoning and 180s when reasoning is active", () => {
+    expect(streamIdleTimeoutFor(haiku, {}, undefined)).toBe(60_000);
+    expect(streamIdleTimeoutFor(haiku, { "reasoning.enabled": true }, undefined)).toBe(180_000);
+    expect(streamIdleTimeoutFor(deepseek, { "reasoning.enabled": false }, undefined)).toBe(60_000);
+    expect(streamIdleTimeoutFor(deepseek, { "reasoning.effort": "high" }, undefined)).toBe(180_000);
+    expect(streamIdleTimeoutFor(deepseek, { "reasoning.effort": "none" }, undefined)).toBe(60_000);
+    // always-on thinking families count as reasoning even with no params
+    expect(streamIdleTimeoutFor(fable, {}, undefined)).toBe(180_000);
+  });
+
+  it("an explicit streamIdleTimeoutMs always wins (0 disables)", () => {
+    expect(streamIdleTimeoutFor(haiku, { "reasoning.enabled": true }, 5_000)).toBe(5_000);
+    expect(streamIdleTimeoutFor(haiku, {}, 0)).toBe(0);
   });
 });
 

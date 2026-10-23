@@ -24,12 +24,26 @@ export type GatewayOptions = {
   includeRaw?: boolean;
   /**
    * stream(): abort with a `timeout` error when no bytes arrive for this long
-   * between chunks (stall guard; pings count as activity). Default 60s; 0 disables.
+   * between chunks (stall guard; pings count as activity). Default 60s, or 180s
+   * when the request reasons (hidden high-effort reasoning can stream nothing
+   * for minutes on OpenAI/Gemini). An explicit value applies to every stream; 0 disables.
    */
   streamIdleTimeoutMs?: number;
 };
 
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 60_000;
+const REASONING_STREAM_IDLE_TIMEOUT_MS = 180_000;
+
+/** Effective stall timeout for one stream (see GatewayOptions.streamIdleTimeoutMs). */
+export function streamIdleTimeoutFor(model: ResolvedModel, effectiveParams: Record<string, unknown>, override: number | undefined): number {
+  if (override !== undefined) return override;
+  const effort = effectiveParams["reasoning.effort"];
+  const reasoning =
+    model.features.thinkingStyle === "always-on" ||
+    effectiveParams["reasoning.enabled"] === true ||
+    (typeof effort === "string" && effort !== "none" && effectiveParams["reasoning.enabled"] !== false);
+  return reasoning ? REASONING_STREAM_IDLE_TIMEOUT_MS : DEFAULT_STREAM_IDLE_TIMEOUT_MS;
+}
 
 const WARNING_CODES = { dropped: "param_dropped", forced: "param_forced", clamped: "param_clamped" } as const;
 
@@ -183,14 +197,14 @@ export class Gateway {
    * Aborts mid-stream surface as an `error` event of kind "network" (see chat()'s abort contract).
    */
   async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
-    const { model, encoded, warnings, excludeReasoning } = this.prepare(request, true);
+    const { model, encoded, warnings, excludeReasoning, effectiveParams } = this.prepare(request, true);
     // Own controller linked to the caller's signal so a stall can abort the
     // upstream fetch/body without being mistaken for a user abort.
     const upstream = new AbortController();
     const onAbort = () => upstream.abort(request.signal?.reason);
     if (request.signal?.aborted) onAbort();
     else request.signal?.addEventListener("abort", onAbort, { once: true });
-    const idleMs = this.options.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS;
+    const idleMs = streamIdleTimeoutFor(model, effectiveParams, this.options.streamIdleTimeoutMs);
     try {
       const response = await fetchWithRetry(model.providerId, encoded, this.transportOptions(upstream.signal));
       if (!response.body) throw new GatewayError("server", `${model.providerId} returned no response body`, { provider: model.providerId });
@@ -222,7 +236,7 @@ export class Gateway {
   private prepare(
     request: ChatRequest,
     stream: boolean
-  ): { model: ResolvedModel; encoded: EncodedRequest; warnings: Warning[]; excludeReasoning: boolean } {
+  ): { model: ResolvedModel; encoded: EncodedRequest; warnings: Warning[]; excludeReasoning: boolean; effectiveParams: Record<string, unknown> } {
     const model = this.resolveOrThrow(request.provider, request.model);
     const validation = validateRequest(model, {
       params: request.params ?? {},
@@ -261,7 +275,8 @@ export class Gateway {
       model,
       encoded,
       warnings: [...toWarnings(validation.warnings), ...content.warnings, ...cache.warnings, ...encoded.warnings],
-      excludeReasoning: validation.effectiveParams["reasoning.exclude"] === true
+      excludeReasoning: validation.effectiveParams["reasoning.exclude"] === true,
+      effectiveParams: validation.effectiveParams
     };
   }
 

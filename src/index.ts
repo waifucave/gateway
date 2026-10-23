@@ -39,7 +39,7 @@ export type {
   Usage,
   Warning
 } from "./client/types.js";
-export { Gateway, createGateway, type GatewayOptions } from "./client/gateway.js";
+export { Gateway, createGateway, streamIdleTimeoutFor, type GatewayOptions } from "./client/gateway.js";
 export { computeCostUsd, normalizeUsage, withCost, type UsageCounts } from "./client/usage.js";
 export { codecFor } from "./codecs/index.js";
 export { openaiChatCodec } from "./codecs/openaiChat.js";
