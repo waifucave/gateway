@@ -95,6 +95,27 @@ describe("gateway.chat", () => {
     ).rejects.toMatchObject({ kind: "auth", status: 401 });
   });
 
+  it("strips images for text-only models with a content_dropped warning (lenient chat path, G9)", async () => {
+    const fetchImpl = jsonFetch(OK_PAYLOAD);
+    const gateway = createGateway({ ...CREDS, fetchImpl });
+    const response = await gateway.chat({
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [
+        { role: "user", content: [{ type: "text", text: "look" }, { type: "image", mimeType: "image/png", data: "AAAA" }] },
+        { role: "user", content: [{ type: "image", mimeType: "image/png", data: "BBBB" }] }
+      ],
+      params: { "reasoning.enabled": false }
+    });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(JSON.stringify(body.messages)).not.toContain("image_url");
+    expect(body.messages[0]).toEqual({ role: "user", content: [{ type: "text", text: "look" }] });
+    expect(response.warnings.filter((w) => w.code === "content_dropped")).toEqual([
+      { code: "content_dropped", param: "messages[0].content[1]", message: "image input is not supported by deepseek:deepseek-v4-pro; image dropped" },
+      { code: "content_dropped", param: "messages[1].content[0]", message: "image input is not supported by deepseek:deepseek-v4-pro; image dropped" }
+    ]);
+  });
+
   it("throws server for non-JSON success bodies", async () => {
     const fetchImpl = vi.fn(async () => new Response("<html>", { status: 200 }));
     const gateway = createGateway({ ...CREDS, fetchImpl });

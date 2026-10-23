@@ -85,7 +85,7 @@ export type Usage = {
 };
 
 export type Warning = {
-  code: "param_dropped" | "param_forced" | "param_clamped" | "passthrough" | "unmapped_param";
+  code: "param_dropped" | "param_forced" | "param_clamped" | "passthrough" | "unmapped_param" | "content_dropped" | "cache_ignored";
   param: string;
   ruleId?: string;
   message: string;

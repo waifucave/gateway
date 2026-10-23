@@ -189,6 +189,20 @@ describe("POST /v1/validate", () => {
     });
   });
 
+  it("checks optional messages against input modalities (G9)", async () => {
+    const handler = createGatewayHandler();
+    const response = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: [{ type: "image", mimeType: "image/png", data: "AA" }] }]
+    });
+    const body = (await response.json()) as { ok: boolean; violations: Array<{ code: string }> };
+    expect(body.ok).toBe(false);
+    expect(body.violations.map((v) => v.code)).toContain("unsupported_modality");
+    const malformed = await post(handler, "/v1/validate", { provider: "deepseek", model: "deepseek-v4-pro", messages: "nope" });
+    expect(malformed.status).toBe(400);
+  });
+
   it("reports forbidden tool choice under thinking (UI live-gating contract)", async () => {
     const handler = createGatewayHandler();
     const response = await post(handler, "/v1/validate", {

@@ -163,3 +163,24 @@ describe("unverified descriptors and placeholder caps (found live in Discord Wai
     expect(validateRequest(pro, { params: {}, toolChoice: "required" }).ok).toBe(false);
   });
 });
+
+describe("validateRequest — input modalities (G9)", () => {
+  const IMAGE_TURN = { role: "user" as const, content: [{ type: "text" as const, text: "look" }, { type: "image" as const, mimeType: "image/png", data: "AAAA" }] };
+
+  it("rejects image content for a text-only model", () => {
+    const model = registry.resolve("deepseek", "deepseek-v4-pro")!;
+    expect(model.modalities.input).not.toContain("image");
+    const result = validateRequest(model, { params: { "reasoning.enabled": false }, messages: [{ role: "user", content: "hi" }, IMAGE_TURN] });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContainEqual({
+      param: "messages[1].content[1]",
+      code: "unsupported_modality",
+      message: "image input is not supported by deepseek:deepseek-v4-pro"
+    });
+  });
+
+  it("accepts image content when the model lists image input", () => {
+    const model = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+    expect(validateRequest(model, { params: {}, messages: [IMAGE_TURN] }).ok).toBe(true);
+  });
+});

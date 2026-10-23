@@ -1,5 +1,5 @@
 import { Registry, type ModelRef } from "../registry/loader.js";
-import { validateRequest, type ValidateInput, type ValidationResult } from "../validate/validateRequest.js";
+import { unsupportedImageBlocks, validateRequest, type ValidateInput, type ValidationResult } from "../validate/validateRequest.js";
 import type { ResolvedModel } from "../registry/types.js";
 import type { ConstraintWarning } from "../validate/constraints.js";
 import { codecFor } from "../codecs/index.js";
@@ -8,7 +8,7 @@ import { fetchWithRetry } from "../transport/http.js";
 import { parseSse, withIdleTimeout } from "../transport/sse.js";
 import { GatewayError } from "../errors.js";
 import { withCost } from "./usage.js";
-import type { ChatRequest, ChatResponse, ContentBlock, StreamEvent, Warning } from "./types.js";
+import type { ChatMessage, ChatRequest, ChatResponse, ContentBlock, StreamEvent, Warning } from "./types.js";
 
 export type GatewayOptions = {
   /** providerId → API key, or a lookup function. The gateway never persists keys. */
@@ -74,6 +74,28 @@ function stripDetailText(detail: Record<string, unknown>): Record<string, unknow
   return "text" in detail || "summary" in detail
     ? { ...detail, ...("text" in detail ? { text: "" } : {}), ...("summary" in detail ? { summary: "" } : {}) }
     : detail;
+}
+
+/**
+ * Lenient chat-path twin of validate()'s `unsupported_modality`: image blocks a
+ * model cannot take are removed (one `content_dropped` warning each). A user
+ * turn left with no blocks becomes a short placeholder so turn order survives.
+ */
+function stripUnsupportedImages(model: ResolvedModel, messages: ChatMessage[]): { messages: ChatMessage[]; warnings: Warning[] } {
+  const locations = unsupportedImageBlocks(model, messages);
+  if (locations.length === 0) return { messages, warnings: [] };
+  const warnings = locations.map((param): Warning => ({
+    code: "content_dropped",
+    param,
+    message: `image input is not supported by ${model.providerId}:${model.modelId}; image dropped`
+  }));
+  const stripped = messages.map((message): ChatMessage => {
+    if (message.role !== "user" || typeof message.content === "string") return message;
+    const kept = message.content.filter((block) => block.type !== "image");
+    if (kept.length === message.content.length) return message;
+    return { ...message, content: kept.length > 0 ? kept : "[image omitted]" };
+  });
+  return { messages: stripped, warnings };
 }
 
 export class Gateway {
@@ -189,10 +211,11 @@ export class Gateway {
     if (apiKey === undefined || apiKey === "") {
       throw new GatewayError("auth", `no credential configured for provider ${model.providerId}`, { provider: model.providerId });
     }
+    const content = stripUnsupportedImages(model, request.messages);
     const encoded = codecFor(model.wire).encode(
       model,
       {
-        messages: request.messages,
+        messages: content.messages,
         tools: request.tools,
         toolChoice: request.toolChoice,
         responseFormat: request.responseFormat,
@@ -205,7 +228,7 @@ export class Gateway {
     return {
       model,
       encoded,
-      warnings: [...toWarnings(validation.warnings), ...encoded.warnings],
+      warnings: [...toWarnings(validation.warnings), ...content.warnings, ...encoded.warnings],
       excludeReasoning: validation.effectiveParams["reasoning.exclude"] === true
     };
   }

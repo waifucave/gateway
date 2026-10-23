@@ -261,8 +261,13 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     if (!parsed.ok) return parsed.response;
     const target = resolveTarget(parsed.body);
     if (!target.ok) return target.response;
-    const { params, toolChoice, responseFormat, stream } = parsed.body;
+    const { params, toolChoice, responseFormat, stream, messages } = parsed.body;
     if (params !== undefined && !isPlainObject(params)) return badRequest("params must be an object");
+    if (messages !== undefined) {
+      if (!Array.isArray(messages)) return badRequest("messages must be an array");
+      const messagesError = validateChatMessages(messages);
+      if (messagesError) return badRequest(messagesError);
+    }
     const toolChoiceError = validateToolChoice(toolChoice);
     if (toolChoiceError) return badRequest(toolChoiceError);
     try {
@@ -270,7 +275,8 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
         params: (params as Record<string, unknown> | undefined) ?? {},
         toolChoice: toolChoice as ValidateInput["toolChoice"],
         responseFormat: responseFormatType(responseFormat),
-        stream: stream === true
+        stream: stream === true,
+        messages: messages as ChatMessage[] | undefined
       });
       return jsonResponse(200, result);
     } catch (error) {
