@@ -1,5 +1,5 @@
 import { GatewayError } from "../errors.js";
-import type { ResolvedModel } from "../registry/types.js";
+import type { ResolvedModel, WireProtocol } from "../registry/types.js";
 import type { Warning } from "../client/types.js";
 
 const UNSAFE_PATH_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -149,10 +149,61 @@ export function parseArguments(provider: string, toolName: string, argumentsJson
   throw new GatewayError("invalid_request", `tool call "${toolName}" has non-object JSON arguments`, { provider });
 }
 
-/** Merge raw passthrough keys into the body, warning per key (MIGRATION_PLAN §4.5). */
-export function applyPassthrough(body: Record<string, unknown>, passthrough: Record<string, unknown> | undefined, warnings: Warning[]): void {
-  for (const [key, value] of Object.entries(passthrough ?? {})) {
-    body[key] = value;
+/**
+ * Body keys each codec owns. Passthrough may never set them: they carry the
+ * typed request (model, conversation, tools, stream framing, structured output)
+ * and overwriting them would bypass validation entirely — /v1/chat is exposed.
+ */
+export const CORE_BODY_KEYS: Record<WireProtocol, ReadonlySet<string>> = {
+  "openai-chat": new Set(["model", "messages", "tools", "tool_choice", "stream", "stream_options", "response_format"]),
+  "openai-responses": new Set(["model", "input", "instructions", "tools", "tool_choice", "stream", "previous_response_id"]),
+  "anthropic-messages": new Set(["model", "messages", "system", "tools", "tool_choice", "stream"]),
+  "google-generative-language": new Set(["contents", "systemInstruction", "tools", "toolConfig"])
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Recursive merge: objects merge key-by-key, everything else (arrays, scalars) replaces. */
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...target };
+  for (const [key, value] of Object.entries(source)) {
+    if (UNSAFE_PATH_KEYS.has(key)) throw new GatewayError("invalid_request", `passthrough key "${key}" is not allowed`);
+    const current = out[key];
+    out[key] = isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
+  }
+  return out;
+}
+
+/**
+ * Merge raw passthrough keys into the body, warning per key (MIGRATION_PLAN §4.5).
+ * With `scope`, the wire's CORE_BODY_KEYS are rejected (GatewayError
+ * invalid_request) and object values deep-merge into what the codec already
+ * wrote (e.g. passthrough `thinking: {display}` keeps the encoded `thinking.type`).
+ */
+export function applyPassthrough(
+  body: Record<string, unknown>,
+  passthrough: Record<string, unknown> | undefined,
+  warnings: Warning[],
+  scope?: { wire: WireProtocol; provider: string }
+): void {
+  const entries = Object.entries(passthrough ?? {});
+  const core = scope ? CORE_BODY_KEYS[scope.wire] : undefined;
+  // validate every key before mutating anything — a rejected request leaves the body untouched
+  for (const [key] of entries) {
+    if (UNSAFE_PATH_KEYS.has(key)) throw new GatewayError("invalid_request", `passthrough key "${key}" is not allowed`, { provider: scope?.provider });
+    if (core?.has(key)) {
+      throw new GatewayError(
+        "invalid_request",
+        `passthrough key "${key}" is reserved by the ${scope!.wire} codec; set it through the typed request fields instead`,
+        { provider: scope!.provider }
+      );
+    }
+  }
+  for (const [key, value] of entries) {
+    const current = body[key];
+    body[key] = scope && isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
     warnings.push({ code: "passthrough", param: key, message: `${key} sent unvalidated via passthrough` });
   }
 }

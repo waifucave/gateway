@@ -144,7 +144,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     if (request.responseFormat.type === "json_schema") setPath(body, "generationConfig.responseJsonSchema", request.responseFormat.schema);
   }
   // streaming is selected via the URL (:streamGenerateContent?alt=sse); no body flag
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 

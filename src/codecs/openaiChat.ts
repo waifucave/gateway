@@ -141,7 +141,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     body.stream = true;
     if (model.features.streamingUsage) body.stream_options = { include_usage: true };
   }
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 

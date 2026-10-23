@@ -136,7 +136,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
           : { type: request.toolChoice };
   }
   if (request.stream) body.stream = true;
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 

@@ -355,6 +355,22 @@ describe("POST /v1/chat (non-streaming)", () => {
     expect(providerBody.error).toMatchObject({ kind: "auth", status: 401, provider: "deepseek" });
   });
 
+  it("400s passthrough that tries to overwrite a core body key (G3) without calling the provider", async () => {
+    const fetchImpl = jsonFetch(OK_PAYLOAD);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      passthrough: { model: "some-other-model" }
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { kind: string; message: string } };
+    expect(body.error.kind).toBe("invalid_request");
+    expect(body.error.message).toMatch(/passthrough key "model" is reserved/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("404s unknown models and 400s missing messages", async () => {
     const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl: jsonFetch(OK_PAYLOAD) });
     expect((await post(handler, "/v1/chat", { provider: "deepseek", model: "nope", messages: [] })).status).toBe(404);
