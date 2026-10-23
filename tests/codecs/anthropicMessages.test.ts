@@ -329,6 +329,55 @@ describe("anthropic-messages encode — messages & tools", () => {
     expect(schema.properties.reply).toEqual({ type: "string", maxLength: 200, description: "the reply" });
   });
 
+  it("forces additionalProperties:false on every object, overriding other values", () => {
+    const encoded = anthropicMessagesCodec.encode(
+      model,
+      {
+        messages: [{ role: "user", content: "hi" }],
+        responseFormat: {
+          type: "json_schema",
+          schema: { type: "object", additionalProperties: true, properties: { m: { type: "object", additionalProperties: { type: "string" } } } }
+        },
+        effectiveParams: {},
+        stream: false
+      },
+      "K"
+    );
+    expect((encoded.body.output_config as { format: { schema: unknown } }).format.schema).toEqual({
+      type: "object",
+      additionalProperties: false,
+      properties: { m: { type: "object", additionalProperties: false } }
+    });
+  });
+
+  it("drops unsigned thinking blocks (e.g. from another provider) with a warning instead of a 400", () => {
+    const encoded = goldenEncode({
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "reasoning", text: "deepseek-style thoughts" },
+            { type: "reasoning", text: "signed", signature: "sig" },
+            { type: "reasoning", text: "", redacted: true, data: "opaque" },
+            { type: "text", text: "answer" }
+          ]
+        },
+        { role: "user", content: "next" }
+      ]
+    });
+    expect((encoded.body.messages as Array<{ content: unknown[] }>)[1]!.content).toEqual([
+      { type: "thinking", thinking: "signed", signature: "sig" },
+      { type: "redacted_thinking", data: "opaque" },
+      { type: "text", text: "answer" }
+    ]);
+    expect(encoded.warnings).toContainEqual({
+      code: "content_dropped",
+      param: "messages[1].content[0]",
+      message: "reasoning block without a signature cannot be replayed to anthropic; dropped"
+    });
+  });
+
   it("json_schema merges with effort inside output_config", () => {
     const sonnet5 = registry.resolve("anthropic", "claude-sonnet-5")!;
     const validation = validateRequest(sonnet5, { params: { "reasoning.effort": "low" }, responseFormat: "json_schema" });

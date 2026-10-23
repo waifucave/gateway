@@ -112,7 +112,7 @@ function encodeMessages(
     if (last && last.role === role) last.content.push(...blocks);
     else out.push({ role, content: blocks });
   };
-  for (const message of messages) {
+  for (const [messageIndex, message] of messages.entries()) {
     if (message.role === "system") {
       const blocks = (typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content)
         .filter((block) => block.text !== "")
@@ -134,14 +134,23 @@ function encodeMessages(
       const blocks =
         typeof message.content === "string"
           ? [{ type: "text", text: message.content }]
-          : message.content.map((block): WireBlock => {
-              if (block.type === "text") return textBlock(block);
+          : message.content.flatMap((block, blockIndex): WireBlock[] => {
+              if (block.type === "text") return [textBlock(block)];
               if (block.type === "toolCall") {
-                return { type: "tool_use", id: block.id, name: block.name, input: parseArguments(model.providerId, block.name, block.arguments) };
+                return [{ type: "tool_use", id: block.id, name: block.name, input: parseArguments(model.providerId, block.name, block.arguments) }];
               }
-              return block.redacted
-                ? { type: "redacted_thinking", data: block.data ?? "" }
-                : pruneUndefined({ type: "thinking", thinking: block.replay ?? block.text, signature: block.signature });
+              if (block.redacted) return [{ type: "redacted_thinking", data: block.data ?? "" }];
+              // Anthropic 400s a thinking block without a signature (e.g. reasoning
+              // produced by another provider after a model switch) — drop it.
+              if (block.signature === undefined || block.signature === "") {
+                warnings.push({
+                  code: "content_dropped",
+                  param: `messages[${messageIndex}].content[${blockIndex}]`,
+                  message: `reasoning block without a signature cannot be replayed to ${model.providerId}; dropped`
+                });
+                return [];
+              }
+              return [{ type: "thinking", thinking: block.replay ?? block.text, signature: block.signature }];
             });
       push("assistant", blocks, message.cacheControl);
     }
@@ -174,6 +183,8 @@ function toAnthropicOutputSchema(schema: unknown): unknown {
       notes.push(`${key}: ${JSON.stringify(value)}`);
     } else if ((key === "properties" || key === "$defs" || key === "definitions") && value && typeof value === "object" && !Array.isArray(value)) {
       out[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([name, sub]) => [name, toAnthropicOutputSchema(sub)]));
+    } else if (key === "additionalProperties") {
+      continue; // re-set to false below for objects
     } else if (key === "items" || key === "anyOf" || key === "allOf" || key === "oneOf" || key === "prefixItems") {
       out[key] = toAnthropicOutputSchema(value);
     } else {
@@ -185,7 +196,8 @@ function toAnthropicOutputSchema(schema: unknown): unknown {
     out.description = typeof out.description === "string" && out.description !== "" ? `${out.description} ${note}` : note;
   }
   const isObject = out.type === "object" || (Array.isArray(out.type) && out.type.includes("object")) || "properties" in out;
-  if (isObject && out.additionalProperties === undefined) out.additionalProperties = false;
+  // Anthropic accepts only `additionalProperties: false` — force it on every object
+  if (isObject) out.additionalProperties = false;
   return out;
 }
 
