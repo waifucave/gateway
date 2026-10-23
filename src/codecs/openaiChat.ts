@@ -200,7 +200,7 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[], warnings:
       // interleaving cannot be represented on this wire and is intentionally lost.
       const text = message.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("");
       const reasoningBlocks = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning");
-      const reasoning = reasoningBlocks.map((b) => b.text).join("");
+      const reasoning = reasoningBlocks.map((b) => b.replay ?? b.text).join("");
       const details = reasoningBlocks.flatMap((b) => b.details ?? []);
       const toolCalls = message.content.filter((b): b is ToolCallBlock => b.type === "toolCall");
       // OpenRouter: replay reasoning_details verbatim (carries Anthropic signatures /

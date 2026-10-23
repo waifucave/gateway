@@ -27,6 +27,12 @@ export type ReasoningBlock = {
   redacted?: boolean;
   data?: string;
   details?: Array<Record<string, unknown>>;
+  /**
+   * Set instead of `text` when `reasoning.exclude` hid the reasoning: the
+   * verbatim original, kept ONLY so the block replays byte-exact (Anthropic
+   * rejects modified thinking blocks). Opaque — never display it.
+   */
+  replay?: string;
 };
 
 /** `arguments` is the raw JSON text of the call arguments (consumers parse it; codecs that need objects parse internally). */

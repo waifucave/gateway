@@ -84,9 +84,11 @@ each codec owns (`model`, `messages`/`input`/`contents`, `system`, `tools`,
 `invalid_request` — see `CORE_BODY_KEYS`.
 
 **`reasoning.exclude`** hides reasoning text gateway-side (no `reasoning-delta`
-events, empty `text` on reasoning blocks) but keeps signatures / redacted data /
-OpenRouter `details` so tool loops still round-trip. On OpenRouter it is also
-sent as `reasoning.exclude`. Pass reasoning blocks back unchanged on tool loops.
+events, empty `text` on reasoning blocks). Signed thinking must replay
+unmodified, so the original text moves to the opaque `replay` field (never
+display it) and signatures / redacted data / OpenRouter `details` stay as-is.
+On OpenRouter it is also sent as `reasoning.exclude`. Pass reasoning blocks
+back unchanged on tool loops.
 
 ### Usage and cost
 

@@ -95,7 +95,7 @@ function encodeContents(
         // Reasoning is re-encoded unconditionally (not gated on features.reasoningRoundTrip,
         // unlike openai-chat): Gemini 3 requires thoughtSignature round-trip on tool loops,
         // mirroring the anthropic-messages pattern.
-        return pruneUndefined({ text: block.text, thought: true, thoughtSignature: block.signature });
+        return pruneUndefined({ text: block.replay ?? block.text, thought: true, thoughtSignature: block.signature });
       });
       push("model", parts);
     }

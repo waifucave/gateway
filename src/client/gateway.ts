@@ -51,9 +51,11 @@ function violationSummary(result: ValidationResult): string {
 }
 
 /**
- * `reasoning.exclude`: hide reasoning TEXT from the normalized response while
- * keeping whatever must round-trip (signatures, redacted data, OpenRouter
- * details). Blocks with nothing left to replay are dropped entirely.
+ * `reasoning.exclude`: the readable `text` is emptied; the original moves to
+ * the opaque `replay` field so the block still round-trips byte-exact (signed
+ * thinking must not be modified). Signatures, redacted data and OpenRouter
+ * `details` (already opaque round-trip data) are untouched. Blocks carrying
+ * nothing at all are dropped.
  */
 function hideReasoning(content: ContentBlock[]): ContentBlock[] {
   const out: ContentBlock[] = [];
@@ -62,19 +64,11 @@ function hideReasoning(content: ContentBlock[]): ContentBlock[] {
       out.push(block);
       continue;
     }
-    const { text: _text, ...rest } = block;
-    const keep = rest.signature !== undefined || rest.redacted === true || rest.data !== undefined || (rest.details?.length ?? 0) > 0;
-    if (keep) out.push({ ...rest, type: "reasoning", text: "", ...(rest.details ? { details: rest.details.map(stripDetailText) } : {}) });
+    const replay = block.replay ?? (block.text !== "" ? block.text : undefined);
+    const keep = replay !== undefined || block.signature !== undefined || block.redacted === true || block.data !== undefined || (block.details?.length ?? 0) > 0;
+    if (keep) out.push({ ...block, text: "", ...(replay !== undefined ? { replay } : {}) });
   }
   return out;
-}
-
-function stripDetailText(detail: Record<string, unknown>): Record<string, unknown> {
-  // reasoning.text / reasoning.summary carry the readable text; signatures and
-  // encrypted data stay. OpenRouter accepts details with an empty text.
-  return "text" in detail || "summary" in detail
-    ? { ...detail, ...("text" in detail ? { text: "" } : {}), ...("summary" in detail ? { summary: "" } : {}) }
-    : detail;
 }
 
 /**

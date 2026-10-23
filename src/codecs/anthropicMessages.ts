@@ -141,7 +141,7 @@ function encodeMessages(
               }
               return block.redacted
                 ? { type: "redacted_thinking", data: block.data ?? "" }
-                : pruneUndefined({ type: "thinking", thinking: block.text, signature: block.signature });
+                : pruneUndefined({ type: "thinking", thinking: block.replay ?? block.text, signature: block.signature });
             });
       push("assistant", blocks, message.cacheControl);
     }

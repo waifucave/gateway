@@ -177,7 +177,7 @@ describe("gateway reasoning.exclude (G1: hidden gateway-side, signatures kept)",
     usage: { input_tokens: 2, output_tokens: 9 }
   };
 
-  it("chat(): strips thinking text but keeps signature/redacted blocks for round-trip", async () => {
+  it("chat(): hides thinking text but keeps it opaque (replay) with the signature for byte-exact round-trip", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(THINKING_PAYLOAD), { status: 200 }));
     const gateway = createGateway({ credentials: { anthropic: "sk-ant" }, fetchImpl });
     const response = await gateway.chat({
@@ -189,10 +189,24 @@ describe("gateway reasoning.exclude (G1: hidden gateway-side, signatures kept)",
     const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
     expect(body.thinking).toEqual({ type: "enabled", budget_tokens: 1024 });
     expect(response.content).toEqual([
-      { type: "reasoning", text: "", signature: "sig_1" },
+      { type: "reasoning", text: "", signature: "sig_1", replay: "secret plan" },
       { type: "reasoning", text: "", redacted: true, data: "opaque" },
       { type: "text", text: "answer" }
     ]);
+    // Anthropic rejects MODIFIED thinking blocks: replaying the hidden block re-sends the original text
+    const second = await gateway.chat({
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: response.content as never },
+        { role: "user", content: "and?" }
+      ],
+      params: { "reasoning.enabled": true, "reasoning.exclude": true }
+    });
+    expect(second.content.at(-1)).toEqual({ type: "text", text: "answer" });
+    const replayed = JSON.parse((fetchImpl.mock.calls[1]![1] as RequestInit).body as string);
+    expect(replayed.messages[1].content[0]).toEqual({ type: "thinking", thinking: "secret plan", signature: "sig_1" });
   });
 
   it("chat(): without exclude the thinking text is surfaced", async () => {
@@ -233,7 +247,7 @@ describe("gateway reasoning.exclude (G1: hidden gateway-side, signatures kept)",
     const done = events.at(-1)!;
     if (done.type !== "done") throw new Error("no done");
     expect(done.response.content).toEqual([
-      { type: "reasoning", text: "", signature: "sig_s" },
+      { type: "reasoning", text: "", signature: "sig_s", replay: "secret" },
       { type: "text", text: "ok" }
     ]);
   });
