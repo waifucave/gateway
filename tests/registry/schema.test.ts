@@ -7,8 +7,9 @@ const dataDir = join(import.meta.dirname, "../../data");
 const files = readdirSync(dataDir).filter((f) => f.endsWith(".json"));
 
 describe("capability data files", () => {
-  it("has 21 capability data files", () => {
-    expect(files).toHaveLength(21);
+  it("has 20 capability data files", () => {
+    // meta-direct.json merged into meta.json (2026-10-23): one file per company
+    expect(files).toHaveLength(20);
   });
 
   it("every doc validates against the schema", () => {
@@ -25,7 +26,7 @@ describe("capability data files", () => {
     }
   });
 
-  it("has 77 docs with unique families and unique (provider, model) routes", () => {
+  it("has 76 docs with unique families and unique (provider, model) routes", () => {
     // openrouter/owl-alpha's whole family was dropped 2026-07-02: it's gone
     // from OpenRouter's live public /models list (no "owl"/"alpha" id at all)
     // and had no other route to fall back to.
@@ -44,6 +45,7 @@ describe("capability data files", () => {
         }
       }
     }
-    expect(count).toBe(77);
+    // 77 → 76 on 2026-10-23: the OpenRouter-only and direct Muse Spark 1.1 families merged into one
+    expect(count).toBe(76);
   });
 });

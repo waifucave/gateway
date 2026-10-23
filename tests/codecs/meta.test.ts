@@ -47,4 +47,23 @@ describe("Meta Muse Spark direct API", () => {
   it("preserves the existing OpenRouter route", () => {
     expect(registry.resolve("openrouter", "meta/muse-spark-1.1")?.baseUrl).toBe("https://openrouter.ai/api/v1");
   });
+
+  it("serves Muse Spark 1.1 as ONE family with both routes (model ids unchanged)", () => {
+    const direct = registry.resolve("meta", "muse-spark-1.1")!;
+    const viaOpenRouter = registry.resolve("openrouter", "meta/muse-spark-1.1")!;
+    expect(direct.family).toBe("muse-spark-1-1");
+    expect(viaOpenRouter.family).toBe("muse-spark-1-1");
+    const metaFamilies = registry.listFamilies().filter((doc) => doc.company === "Meta");
+    expect(metaFamilies.map((doc) => doc.family).sort()).toEqual([
+      "muse-spark-1-1",
+      "muse-spark-1-2",
+      "muse-spark-1-2-contributor",
+      "muse-spark-1-3",
+      "muse-spark-1-3-contributor"
+    ]);
+    // the OpenRouter route keeps its own modalities/pricing overlay
+    expect(viaOpenRouter.modalities.input).toContain("image");
+    expect(viaOpenRouter.meta.pricing?.inputPerMTok).toBe(1.25);
+    expect(Object.keys(viaOpenRouter.params).sort()).toEqual(["maxOutputTokens", "reasoning.effort", "temperature", "topP"]);
+  });
 });
