@@ -71,6 +71,7 @@ describe("GET /v1/models", () => {
       jsonMode: true,
       jsonSchema: false,
       imageInput: false,
+      promptCaching: "implicit",
       deprecated: false,
       confidence: "verified"
     });

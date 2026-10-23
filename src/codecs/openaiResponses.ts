@@ -30,7 +30,8 @@ function encodeInput(messages: ChatMessage[]): Array<Record<string, unknown>> {
   const input: Array<Record<string, unknown>> = [];
   for (const message of messages) {
     if (message.role === "system") {
-      input.push({ role: "developer", content: [{ type: "input_text", text: message.content }] });
+      const blocks = typeof message.content === "string" ? [{ text: message.content }] : message.content.filter((block) => block.text !== "");
+      input.push({ role: "developer", content: blocks.map((block) => ({ type: "input_text", text: block.text })) });
     } else if (message.role === "tool") {
       input.push({ type: "function_call_output", call_id: message.toolCallId, output: message.content });
     } else if (message.role === "user") {
@@ -66,6 +67,8 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const warnings = [...mapped.warnings];
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
   body.input = encodeInput(request.messages);
+  // OpenAI caches prefixes implicitly; cache markers are a no-op, the key routes requests to a shared cache.
+  if (request.promptCacheKey !== undefined) body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) =>
       pruneUndefined({ type: "function", name: tool.name, description: tool.description, parameters: tool.parameters, strict: tool.strict })

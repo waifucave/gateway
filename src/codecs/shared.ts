@@ -1,6 +1,6 @@
 import { GatewayError } from "../errors.js";
 import type { ResolvedModel, WireProtocol } from "../registry/types.js";
-import type { Warning } from "../client/types.js";
+import type { CacheControl, ChatMessage, TextBlock, Warning } from "../client/types.js";
 
 const UNSAFE_PATH_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -213,5 +213,60 @@ export function applyPassthrough(
     const current = body[key];
     body[key] = scope && isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
     warnings.push({ code: "passthrough", param: key, message: `${key} sent unvalidated via passthrough` });
+  }
+}
+
+/** System content as one string (wires without system block arrays). */
+export function systemText(content: string | TextBlock[]): string {
+  return typeof content === "string" ? content : content.map((block) => block.text).join("\n\n");
+}
+
+/** True when a message (or one of its text blocks) carries a cache breakpoint. */
+export function hasCacheMarker(message: ChatMessage): boolean {
+  if (message.cacheControl) return true;
+  return Array.isArray(message.content) && message.content.some((block) => block.type === "text" && block.cacheControl !== undefined);
+}
+
+/** Unified CacheControl → wire `cache_control` (Anthropic / OpenRouter share the shape). */
+export function wireCacheControl(cacheControl: CacheControl): Record<string, unknown> {
+  return cacheControl.ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+}
+
+export const MAX_CACHE_BREAKPOINTS = 4;
+
+/**
+ * Enforce Anthropic's breakpoint rules on wire blocks in RENDER order
+ * (tools → system → messages): at most 4 (`cache_control` removed from the
+ * earliest extras), and a 1h breakpoint may not follow a 5m one (downgraded).
+ * Each adjustment emits a `cache_ignored` warning.
+ */
+export function enforceCacheBreakpoints(blocks: Array<Record<string, unknown>>, provider: string, warnings: Warning[]): void {
+  const marked = blocks.filter((block) => block.cache_control !== undefined);
+  const excess = marked.length - MAX_CACHE_BREAKPOINTS;
+  if (excess > 0) {
+    for (const block of marked.slice(0, excess)) delete block.cache_control;
+    warnings.push({
+      code: "cache_ignored",
+      param: "cacheControl",
+      message: `${provider} allows at most ${MAX_CACHE_BREAKPOINTS} cache breakpoints; dropped the ${excess} earliest`
+    });
+  }
+  let sawShort = false;
+  let downgraded = 0;
+  for (const block of marked.slice(Math.max(excess, 0))) {
+    const control = block.cache_control as { ttl?: string };
+    if (control.ttl === "1h" && sawShort) {
+      block.cache_control = { type: "ephemeral" };
+      downgraded++;
+    } else if (control.ttl !== "1h") {
+      sawShort = true;
+    }
+  }
+  if (downgraded > 0) {
+    warnings.push({
+      code: "cache_ignored",
+      param: "cacheControl",
+      message: `${downgraded} 1h cache breakpoint(s) after a 5m breakpoint downgraded to 5m (longer TTLs must come first)`
+    });
   }
 }

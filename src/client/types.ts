@@ -1,6 +1,14 @@
 import type { GatewayError } from "../errors.js";
 
-export type TextBlock = { type: "text"; text: string };
+/**
+ * Provider-agnostic prompt-cache breakpoint: "cache everything up to and
+ * including this block". Anthropic → `cache_control` (max 4 per request);
+ * OpenRouter Anthropic/Gemini routes → `cache_control` on content parts;
+ * OpenAI/Google/others cache implicitly and ignore it. Default TTL 5m.
+ */
+export type CacheControl = { type: "ephemeral"; ttl?: "5m" | "1h" };
+
+export type TextBlock = { type: "text"; text: string; cacheControl?: CacheControl };
 
 /** `data` is base64-encoded image bytes. */
 export type ImageBlock = { type: "image"; mimeType: string; data: string };
@@ -27,11 +35,17 @@ export type ToolCallBlock = { type: "toolCall"; id: string; name: string; argume
 
 export type ContentBlock = TextBlock | ReasoningBlock | ToolCallBlock;
 
+/**
+ * `cacheControl` on a message marks its LAST block as a cache breakpoint
+ * (block-level `TextBlock.cacheControl` marks one block). System content may
+ * be an array of text blocks so a static prefix can be marked separately;
+ * wires without block arrays join system blocks with "\n\n".
+ */
 export type ChatMessage =
-  | { role: "system"; content: string }
-  | { role: "user"; content: string | Array<TextBlock | ImageBlock> }
-  | { role: "assistant"; content: string | Array<TextBlock | ReasoningBlock | ToolCallBlock> }
-  | { role: "tool"; toolCallId: string; content: string };
+  | { role: "system"; content: string | TextBlock[]; cacheControl?: CacheControl }
+  | { role: "user"; content: string | Array<TextBlock | ImageBlock>; cacheControl?: CacheControl }
+  | { role: "assistant"; content: string | Array<TextBlock | ReasoningBlock | ToolCallBlock>; cacheControl?: CacheControl }
+  | { role: "tool"; toolCallId: string; content: string; cacheControl?: CacheControl };
 
 /** Tools are defined ONCE in JSON Schema; codecs translate per wire. */
 export type ToolDef = { name: string; description?: string; parameters: Record<string, unknown>; strict?: boolean };
@@ -51,8 +65,10 @@ export type ChatRequest = {
   responseFormat?: ResponseFormat;
   /** Validated against the capability doc (including provider-scoped dotted keys). */
   params?: Record<string, unknown>;
-  /** Merged raw into the wire body, unvalidated; each key emits a warning. */
+  /** Merged raw into the wire body, unvalidated; each key emits a warning. Core keys (model, messages, …) are rejected. */
   passthrough?: Record<string, unknown>;
+  /** Cache-routing key for providers that take one (OpenAI `prompt_cache_key`), e.g. `waifu:<id>:<conversation>`. */
+  promptCacheKey?: string;
   signal?: AbortSignal;
 };
 

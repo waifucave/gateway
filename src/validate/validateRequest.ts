@@ -1,5 +1,6 @@
 import { ParamDescriptor, ResolvedModel } from "../registry/types.js";
 import type { ChatMessage } from "../client/types.js";
+import { hasCacheMarker } from "../codecs/shared.js";
 import { applyConstraints, ConstraintViolation, ConstraintWarning } from "./constraints.js";
 
 export type ValidateInput = {
@@ -20,7 +21,7 @@ export type ValidationViolation =
   | {
       ruleId?: undefined;
       param: string;
-      code: "unknown_param" | "wrong_type" | "out_of_range" | "bad_enum" | "max_items" | "unsupported_tool_choice" | "unsupported_response_format" | "unsupported_stream" | "unsupported_modality";
+      code: "unknown_param" | "wrong_type" | "out_of_range" | "bad_enum" | "max_items" | "unsupported_tool_choice" | "unsupported_response_format" | "unsupported_stream" | "unsupported_modality" | "unsupported_prompt_caching";
       message: string;
     };
 
@@ -117,6 +118,13 @@ export function validateRequest(model: ResolvedModel, input: ValidateInput): Val
   }
   if (input.stream && !model.features.streaming) {
     violations.push({ param: "stream", code: "unsupported_stream", message: "streaming is not supported" });
+  }
+  if (model.features.promptCaching.kind === "none" && input.messages?.some(hasCacheMarker)) {
+    violations.push({
+      param: "cacheControl",
+      code: "unsupported_prompt_caching",
+      message: `${model.providerId}:${model.modelId} does not support prompt caching`
+    });
   }
   for (const location of unsupportedImageBlocks(model, input.messages)) {
     violations.push({

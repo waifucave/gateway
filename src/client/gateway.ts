@@ -7,6 +7,7 @@ import type { EncodedRequest } from "../codecs/types.js";
 import { fetchWithRetry } from "../transport/http.js";
 import { parseSse, withIdleTimeout } from "../transport/sse.js";
 import { GatewayError } from "../errors.js";
+import { hasCacheMarker } from "../codecs/shared.js";
 import { withCost } from "./usage.js";
 import type { ChatMessage, ChatRequest, ChatResponse, ContentBlock, StreamEvent, Warning } from "./types.js";
 
@@ -96,6 +97,41 @@ function stripUnsupportedImages(model: ResolvedModel, messages: ChatMessage[]): 
     return { ...message, content: kept.length > 0 ? kept : "[image omitted]" };
   });
   return { messages: stripped, warnings };
+}
+
+/** Remove every cache breakpoint (message- and block-level). */
+function stripCacheMarkers(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message): ChatMessage => {
+    const { cacheControl: _drop, ...rest } = message;
+    if (!Array.isArray(rest.content)) return rest as ChatMessage;
+    const content = (rest.content as Array<Record<string, unknown>>).map((block) => {
+      if (!("cacheControl" in block)) return block;
+      const { cacheControl: _blockDrop, ...plain } = block;
+      return plain;
+    });
+    return { ...rest, content } as ChatMessage;
+  });
+}
+
+/**
+ * features.promptCaching gate for the lenient chat path: a model with
+ * `kind: "none"` gets no breakpoints and no cache key (one `cache_ignored`
+ * warning); implicit/explicit models pass both to the codec, which maps or
+ * ignores them per wire. validate() reports the same case as a violation.
+ */
+function applyCachePolicy(
+  model: ResolvedModel,
+  messages: ChatMessage[],
+  promptCacheKey: string | undefined
+): { messages: ChatMessage[]; promptCacheKey?: string; warnings: Warning[] } {
+  if (model.features.promptCaching.kind !== "none") return { messages, promptCacheKey, warnings: [] };
+  if (!messages.some(hasCacheMarker) && promptCacheKey === undefined) return { messages, warnings: [] };
+  return {
+    messages: stripCacheMarkers(messages),
+    warnings: [
+      { code: "cache_ignored", param: "cacheControl", message: `${model.providerId}:${model.modelId} does not support prompt caching; cache hints not sent` }
+    ]
+  };
 }
 
 export class Gateway {
@@ -212,10 +248,12 @@ export class Gateway {
       throw new GatewayError("auth", `no credential configured for provider ${model.providerId}`, { provider: model.providerId });
     }
     const content = stripUnsupportedImages(model, request.messages);
+    const cache = applyCachePolicy(model, content.messages, request.promptCacheKey);
     const encoded = codecFor(model.wire).encode(
       model,
       {
-        messages: content.messages,
+        messages: cache.messages,
+        promptCacheKey: cache.promptCacheKey,
         tools: request.tools,
         toolChoice: request.toolChoice,
         responseFormat: request.responseFormat,
@@ -228,7 +266,7 @@ export class Gateway {
     return {
       model,
       encoded,
-      warnings: [...toWarnings(validation.warnings), ...content.warnings, ...encoded.warnings],
+      warnings: [...toWarnings(validation.warnings), ...content.warnings, ...cache.warnings, ...encoded.warnings],
       excludeReasoning: validation.effectiveParams["reasoning.exclude"] === true
     };
   }

@@ -4,7 +4,7 @@ import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
 import { normalizeUsage } from "../client/usage.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
+import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath, systemText } from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
   STOP: "stop",
@@ -52,7 +52,8 @@ function encodeContents(
   };
   for (const message of messages) {
     if (message.role === "system") {
-      systems.push(message.content);
+      // Gemini caches implicitly; cacheControl markers are a no-op on this wire.
+      systems.push(systemText(message.content));
     } else if (message.role === "tool") {
       const name = toolNameById.get(message.toolCallId);
       if (name === undefined) {

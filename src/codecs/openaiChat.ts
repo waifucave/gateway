@@ -1,6 +1,7 @@
 import { GatewayError } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
 import type {
+  CacheControl,
   ChatMessage,
   ChatResponse,
   ContentBlock,
@@ -9,12 +10,24 @@ import type {
   StreamEvent,
   TextBlock,
   ToolCallBlock,
-  Usage
+  Usage,
+  Warning
 } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
 import { normalizeUsage } from "../client/usage.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, mapOpenRouterParams, pruneUndefined } from "./shared.js";
+import {
+  applyPassthrough,
+  authHeaders,
+  buildUrl,
+  enforceCacheBreakpoints,
+  hasCacheMarker,
+  mapNativeParams,
+  mapOpenRouterParams,
+  pruneUndefined,
+  systemText,
+  wireCacheControl
+} from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
   stop: "stop",
@@ -122,28 +135,66 @@ function reasoningBlock(text: string, details: ReasoningDetail[]): ReasoningBloc
   return details.length > 0 ? { type: "reasoning", text, details } : { type: "reasoning", text };
 }
 
-function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Record<string, unknown>> {
+/**
+ * OpenRouter forwards `cache_control` on content parts to Anthropic and Gemini
+ * upstreams (content must then be an array of parts). Every other
+ * OpenAI-compatible route caches implicitly — markers are simply not sent.
+ */
+function usesCacheHints(model: ResolvedModel): boolean {
+  return model.providerId === "openrouter" && (model.company === "Anthropic" || model.company === "Google") && model.features.promptCaching.kind === "explicit";
+}
+
+type WirePart = Record<string, unknown>;
+
+function textPart(block: TextBlock, hints: boolean): WirePart {
+  return hints && block.cacheControl ? { type: "text", text: block.text, cache_control: wireCacheControl(block.cacheControl) } : { type: "text", text: block.text };
+}
+
+/** Message-level breakpoint → last text part (else the last part). */
+function markLastPart(parts: WirePart[], cacheControl: CacheControl | undefined): void {
+  if (!cacheControl || parts.length === 0) return;
+  let index = parts.length - 1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (parts[i]!.type === "text") {
+      index = i;
+      break;
+    }
+  }
+  parts[index] = { ...parts[index]!, cache_control: wireCacheControl(cacheControl) };
+}
+
+/** String content with a breakpoint becomes a single marked text part. */
+function markedText(text: string, cacheControl: CacheControl | undefined, hints: boolean): string | WirePart[] {
+  return hints && cacheControl ? [{ type: "text", text, cache_control: wireCacheControl(cacheControl) }] : text;
+}
+
+function encodeMessages(model: ResolvedModel, messages: ChatMessage[], warnings: Warning[]): Array<Record<string, unknown>> {
   const openrouter = model.providerId === "openrouter";
+  const hints = usesCacheHints(model);
   const out: Array<Record<string, unknown>> = [];
   for (const message of messages) {
     if (message.role === "system") {
-      out.push({ role: "system", content: message.content });
+      if (hints && hasCacheMarker(message) && Array.isArray(message.content)) {
+        const parts = message.content.map((block) => textPart(block, hints));
+        markLastPart(parts, message.cacheControl);
+        out.push({ role: "system", content: parts });
+      } else {
+        out.push({ role: "system", content: markedText(systemText(message.content), message.cacheControl, hints) });
+      }
     } else if (message.role === "tool") {
-      out.push({ role: "tool", tool_call_id: message.toolCallId, content: message.content });
+      out.push({ role: "tool", tool_call_id: message.toolCallId, content: markedText(message.content, message.cacheControl, hints) });
     } else if (message.role === "user") {
-      out.push({
-        role: "user",
-        content:
-          typeof message.content === "string"
-            ? message.content
-            : message.content.map((block) =>
-                block.type === "text"
-                  ? { type: "text", text: block.text }
-                  : { type: "image_url", image_url: { url: `data:${block.mimeType};base64,${block.data}` } }
-              )
-      });
+      if (typeof message.content === "string") {
+        out.push({ role: "user", content: markedText(message.content, message.cacheControl, hints) });
+        continue;
+      }
+      const parts = message.content.map((block) =>
+        block.type === "text" ? textPart(block, hints) : { type: "image_url", image_url: { url: `data:${block.mimeType};base64,${block.data}` } }
+      );
+      if (hints) markLastPart(parts, message.cacheControl);
+      out.push({ role: "user", content: parts });
     } else if (typeof message.content === "string") {
-      out.push({ role: "assistant", content: message.content });
+      out.push({ role: "assistant", content: markedText(message.content, message.cacheControl, hints) });
     } else {
       // Text blocks are joined into the single wire `content` string; text/toolCall
       // interleaving cannot be represented on this wire and is intentionally lost.
@@ -157,11 +208,15 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Re
       // or on any turn when the family requires reasoning round-trip. Native
       // routes keep the DeepSeek-style reasoning_content field.
       const replay = toolCalls.length > 0 || model.features.reasoningRoundTrip === true;
+      const marker = message.cacheControl ?? message.content.find((b): b is TextBlock => b.type === "text" && b.cacheControl !== undefined)?.cacheControl;
+      if (hints && marker && text === "") {
+        warnings.push({ code: "cache_ignored", param: "cacheControl", message: "cache breakpoint on an assistant turn without text was ignored" });
+      }
       out.push(
         pruneUndefined({
           role: "assistant",
           // content:null is only valid alongside tool_calls; otherwise the wire requires a string
-          content: text !== "" ? text : toolCalls.length ? null : "",
+          content: text !== "" ? markedText(text, marker, hints) : toolCalls.length ? null : "",
           tool_calls: toolCalls.length
             ? toolCalls.map((call) => ({ id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } }))
             : undefined,
@@ -173,6 +228,10 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Re
       );
     }
   }
+  if (hints && model.company === "Anthropic") {
+    const parts = out.flatMap((message) => (Array.isArray(message.content) ? (message.content as WirePart[]) : []));
+    enforceCacheBreakpoints(parts, model.providerId, warnings);
+  }
   return out;
 }
 
@@ -180,7 +239,9 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const mapped = model.providerId === "openrouter" ? mapOpenRouterParams(model, request.effectiveParams) : mapNativeParams(model, request.effectiveParams);
   const warnings = [...mapped.warnings];
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
-  body.messages = encodeMessages(model, request.messages);
+  body.messages = encodeMessages(model, request.messages, warnings);
+  // OpenAI routes cache automatically; prompt_cache_key steers requests sharing a prefix to the same cache.
+  if (request.promptCacheKey !== undefined && model.company === "OpenAI") body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) => ({
       type: "function",

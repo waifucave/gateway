@@ -13,6 +13,8 @@ export type CodecRequest = {
    */
   effectiveParams: Record<string, unknown>;
   passthrough?: Record<string, unknown>;
+  /** OpenAI prompt_cache_key; ignored by wires without one. */
+  promptCacheKey?: string;
   stream: boolean;
 };
 

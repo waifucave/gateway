@@ -1,10 +1,20 @@
 import { GatewayError, extractErrorMessage } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
-import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, Usage } from "../client/types.js";
+import type { CacheControl, ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, TextBlock, Usage, Warning } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
 import { normalizeUsage } from "../client/usage.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
+import {
+  applyPassthrough,
+  authHeaders,
+  buildUrl,
+  enforceCacheBreakpoints,
+  mapNativeParams,
+  parseArguments,
+  pruneUndefined,
+  setPath,
+  wireCacheControl
+} from "./shared.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_THINKING_BUDGET = 1024;
@@ -60,39 +70,71 @@ function defaultMaxTokens(model: ResolvedModel): number {
 
 type WireMessage = { role: "user" | "assistant"; content: Array<Record<string, unknown>> };
 
-function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): { system?: string; messages: WireMessage[] } {
-  const systems: string[] = [];
+type WireBlock = Record<string, unknown>;
+
+/** Text block → wire block, carrying a block-level cache breakpoint. */
+function textBlock(block: TextBlock): WireBlock {
+  return block.cacheControl ? { type: "text", text: block.text, cache_control: wireCacheControl(block.cacheControl) } : { type: "text", text: block.text };
+}
+
+/**
+ * Message-level breakpoint → the LAST block of that message that may carry
+ * one. Thinking / redacted_thinking blocks cannot be cache-marked, so the mark
+ * walks back past them; a message with nothing markable is reported.
+ */
+function markLastBlock(blocks: WireBlock[], cacheControl: CacheControl | undefined, warnings: Warning[]): void {
+  if (!cacheControl) return;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const type = blocks[i]!.type;
+    if (type === "thinking" || type === "redacted_thinking") continue;
+    blocks[i] = { ...blocks[i]!, cache_control: wireCacheControl(cacheControl) };
+    return;
+  }
+  warnings.push({ code: "cache_ignored", param: "cacheControl", message: "cache breakpoint on a message with no cacheable block was ignored" });
+}
+
+function encodeMessages(
+  model: ResolvedModel,
+  messages: ChatMessage[],
+  warnings: Warning[]
+): { system?: string | WireBlock[]; messages: WireMessage[] } {
+  const systemBlocks: WireBlock[] = [];
+  let systemMarked = false;
   const out: WireMessage[] = [];
   // Anthropic rejects empty content arrays and empty text blocks (400) —
   // strip empty text blocks and drop turns that end up with no blocks at all.
-  const push = (role: "user" | "assistant", rawBlocks: Array<Record<string, unknown>>) => {
+  const push = (role: "user" | "assistant", rawBlocks: WireBlock[], cacheControl: CacheControl | undefined) => {
     const blocks = rawBlocks.filter((block) => !(block.type === "text" && block.text === ""));
     if (blocks.length === 0) return;
+    markLastBlock(blocks, cacheControl, warnings);
     const last = out[out.length - 1];
     if (last && last.role === role) last.content.push(...blocks);
     else out.push({ role, content: blocks });
   };
   for (const message of messages) {
     if (message.role === "system") {
-      systems.push(message.content);
+      const blocks = (typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content)
+        .filter((block) => block.text !== "")
+        .map(textBlock);
+      markLastBlock(blocks, message.cacheControl, warnings);
+      if (blocks.some((block) => block.cache_control !== undefined) || Array.isArray(message.content)) systemMarked = true;
+      systemBlocks.push(...blocks);
     } else if (message.role === "tool") {
-      push("user", [{ type: "tool_result", tool_use_id: message.toolCallId, content: message.content }]);
+      push("user", [{ type: "tool_result", tool_use_id: message.toolCallId, content: message.content }], message.cacheControl);
     } else if (message.role === "user") {
       const blocks =
         typeof message.content === "string"
           ? [{ type: "text", text: message.content }]
           : message.content.map((block) =>
-              block.type === "text"
-                ? { type: "text", text: block.text }
-                : { type: "image", source: { type: "base64", media_type: block.mimeType, data: block.data } }
+              block.type === "text" ? textBlock(block) : { type: "image", source: { type: "base64", media_type: block.mimeType, data: block.data } }
             );
-      push("user", blocks);
+      push("user", blocks, message.cacheControl);
     } else {
       const blocks =
         typeof message.content === "string"
           ? [{ type: "text", text: message.content }]
-          : message.content.map((block): Record<string, unknown> => {
-              if (block.type === "text") return { type: "text", text: block.text };
+          : message.content.map((block): WireBlock => {
+              if (block.type === "text") return textBlock(block);
               if (block.type === "toolCall") {
                 return { type: "tool_use", id: block.id, name: block.name, input: parseArguments(model.providerId, block.name, block.arguments) };
               }
@@ -100,10 +142,15 @@ function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): { system
                 ? { type: "redacted_thinking", data: block.data ?? "" }
                 : pruneUndefined({ type: "thinking", thinking: block.text, signature: block.signature });
             });
-      push("assistant", blocks);
+      push("assistant", blocks, message.cacheControl);
     }
   }
-  return { system: systems.length > 0 ? systems.join("\n\n") : undefined, messages: out };
+  // Breakpoints need the block form; unmarked plain-string systems keep the
+  // historical joined string (byte-identical prompts for existing callers).
+  const system =
+    systemBlocks.length === 0 ? undefined : systemMarked ? systemBlocks : systemBlocks.map((block) => block.text as string).join("\n\n");
+  enforceCacheBreakpoints([...(Array.isArray(system) ? system : []), ...out.flatMap((message) => message.content)], model.providerId, warnings);
+  return { system, messages: out };
 }
 
 /**
@@ -174,7 +221,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
       body.thinking = { type: "disabled" };
     }
   }
-  const { system, messages } = encodeMessages(model, request.messages);
+  const { system, messages } = encodeMessages(model, request.messages, warnings);
   if (system !== undefined) body.system = system;
   body.messages = messages;
   if (request.tools?.length) {

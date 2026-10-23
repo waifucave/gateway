@@ -22,6 +22,7 @@ export { applyConstraints, type ConstraintResult, type ConstraintViolation, type
 export { validateRequest, type ValidateInput, type ValidationResult, type ValidationViolation } from "./validate/validateRequest.js";
 export { GatewayError, extractErrorMessage, kindForStatus, type GatewayErrorKind } from "./errors.js";
 export type {
+  CacheControl,
   ChatMessage,
   ChatRequest,
   ChatResponse,
@@ -46,7 +47,7 @@ export { openaiResponsesCodec } from "./codecs/openaiResponses.js";
 export { anthropicMessagesCodec } from "./codecs/anthropicMessages.js";
 export { googleGenerativeLanguageCodec } from "./codecs/googleGenerativeLanguage.js";
 export type { Codec, CodecRequest, EncodedRequest } from "./codecs/types.js";
-export { authHeaders, buildUrl } from "./codecs/shared.js";
+export { CORE_BODY_KEYS, MAX_CACHE_BREAKPOINTS, authHeaders, buildUrl } from "./codecs/shared.js";
 export { parseSse, type SseEvent } from "./transport/sse.js";
 export { fetchWithRetry, type HttpOptions, type HttpRequest } from "./transport/http.js";
 export {

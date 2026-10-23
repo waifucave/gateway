@@ -21,6 +21,8 @@ export type ModelSummary = {
   jsonMode: boolean;
   jsonSchema: boolean;
   imageInput: boolean;
+  /** features.promptCaching.kind: "explicit" honours cacheControl breakpoints, "implicit" caches automatically, "none" ignores hints. */
+  promptCaching: "none" | "implicit" | "explicit";
   deprecated: boolean;
   confidence: string;
   routeStatus?: string;
@@ -84,14 +86,24 @@ const CHAT_ROLES = new Set(["system", "user", "assistant", "tool"]);
 
 /** Mirrors the ChatMessage union in client/types.ts: user/assistant content arrays allow different block types. */
 const CONTENT_BLOCK_TYPES = new Set(["text", "image", "reasoning", "toolCall"]);
-const CONTENT_BLOCK_TYPES_BY_ROLE: Record<"user" | "assistant", Set<string>> = {
+const CONTENT_BLOCK_TYPES_BY_ROLE: Record<"user" | "assistant" | "system", Set<string>> = {
+  system: new Set(["text"]),
   user: new Set(["text", "image"]),
   assistant: new Set(["text", "reasoning", "toolCall"])
 };
 
-function validateContentBlock(block: unknown, messageIndex: number, blockIndex: number, role: "user" | "assistant"): string | undefined {
+function validateCacheControl(value: unknown, where: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value) || value.type !== "ephemeral") return `${where}: cacheControl must be { type: "ephemeral", ttl?: "5m" | "1h" }`;
+  if (value.ttl !== undefined && value.ttl !== "5m" && value.ttl !== "1h") return `${where}: cacheControl.ttl must be "5m" or "1h"`;
+  return undefined;
+}
+
+function validateContentBlock(block: unknown, messageIndex: number, blockIndex: number, role: "user" | "assistant" | "system"): string | undefined {
   const prefix = `messages[${messageIndex}].content[${blockIndex}]`;
   if (!isPlainObject(block)) return `${prefix} must be an object`;
+  const cacheError = validateCacheControl(block.cacheControl, prefix);
+  if (cacheError) return cacheError;
   if (!CONTENT_BLOCK_TYPES.has(block.type as string)) {
     return `${prefix}: unknown content block type ${JSON.stringify(block.type)}`;
   }
@@ -131,19 +143,17 @@ function validateChatMessages(messages: unknown[]): string | undefined {
     if (typeof message.role !== "string" || !CHAT_ROLES.has(message.role)) {
       return `messages[${i}]: missing or invalid "role"`;
     }
+    const cacheError = validateCacheControl(message.cacheControl, `messages[${i}]`);
+    if (cacheError) return cacheError;
     if (message.role === "tool") {
       if (typeof message.toolCallId !== "string" || message.toolCallId === "") return `messages[${i}]: "toolCallId" is required`;
       if (typeof message.content !== "string") return `messages[${i}]: "content" must be a string`;
       continue;
     }
-    if (message.role === "system") {
-      if (typeof message.content !== "string") return `messages[${i}]: "content" must be a string`;
-      continue;
-    }
-    // user / assistant: content is a string or an array of content blocks
+    // system / user / assistant: content is a string or an array of content blocks
     if (typeof message.content === "string") continue;
     if (!Array.isArray(message.content)) return `messages[${i}]: "content" must be a string or an array`;
-    const role = message.role as "user" | "assistant";
+    const role = message.role as "user" | "assistant" | "system";
     for (let j = 0; j < message.content.length; j++) {
       const error = validateContentBlock(message.content[j], i, j, role);
       if (error) return error;
@@ -215,6 +225,7 @@ function buildModelSummaries(gateway: Gateway): ModelSummary[] {
       jsonMode: model.features.structuredOutput.jsonMode ?? false,
       jsonSchema: model.features.structuredOutput.jsonSchema ?? false,
       imageInput: model.modalities.input.includes("image"),
+      promptCaching: model.features.promptCaching.kind,
       deprecated: model.meta.deprecated ?? false,
       confidence: model.meta.confidence,
       ...(model.meta.routeStatus !== undefined ? { routeStatus: model.meta.routeStatus } : {})
@@ -303,6 +314,7 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
     }
     const toolChoiceError = validateToolChoice(body.toolChoice);
     if (toolChoiceError) return badRequest(toolChoiceError);
+    if (body.promptCacheKey !== undefined && typeof body.promptCacheKey !== "string") return badRequest("promptCacheKey must be a string");
     const chatRequest: ChatRequest = {
       provider: target.provider,
       model: target.model,
@@ -312,6 +324,7 @@ export function createGatewayHandler(options: GatewayHandlerOptions = {}): Gatew
       responseFormat: body.responseFormat as ResponseFormat | undefined,
       params: body.params as Record<string, unknown> | undefined,
       passthrough: body.passthrough as Record<string, unknown> | undefined,
+      promptCacheKey: body.promptCacheKey as string | undefined,
       signal: request.signal
     };
     if (body.stream === true) return streamingChat(chatRequest, request.signal);
