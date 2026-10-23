@@ -42,6 +42,24 @@ describe("fetchWithRetry", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3); // 1 attempt + 2 retries
   });
 
+  it("does NOT retry quota/billing 429s (classified before the retry decision)", async () => {
+    for (const code of ["insufficient_quota", "billing_hard_limit_reached"]) {
+      const fetchImpl = vi.fn().mockResolvedValue(json({ error: { code, message: "You exceeded your current quota" } }, 429));
+      const error = await fetchWithRetry("openai", REQ, { ...FAST, fetchImpl }).catch((e) => e);
+      expect(error).toBeInstanceOf(GatewayError);
+      expect(["quota", "billing"]).toContain(error.kind);
+      expect(error.retryable).toBe(false);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("does NOT retry 402 billing errors", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(json({ error: { code: 402, message: "Insufficient credits" } }, 402));
+    const error = await fetchWithRetry("openrouter", REQ, { ...FAST, fetchImpl }).catch((e) => e);
+    expect(error.kind).toBe("billing");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("does NOT retry 4xx and extracts the provider message", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(json({ error: { message: "bad param" } }, 400));
     const error = await fetchWithRetry("openai", REQ, { ...FAST, fetchImpl }).catch((e) => e);

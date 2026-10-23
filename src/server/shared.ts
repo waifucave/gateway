@@ -5,6 +5,8 @@ const STATUS_FOR_KIND: Record<GatewayErrorKind, number> = {
   auth: 401,
   rate_limit: 429,
   quota: 402,
+  billing: 402,
+  context_overflow: 400,
   invalid_request: 400,
   unsupported_parameter: 400,
   content_filter: 422,
