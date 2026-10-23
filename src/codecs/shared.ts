@@ -44,6 +44,13 @@ export function pruneUndefined<T>(value: T): T {
 /** effectiveParams keys that are validation directives, not wire params. */
 const DIRECTIVE_PARAMS = new Set(["reasoningRoundTrip"]);
 
+/**
+ * Params the GATEWAY implements when a descriptor carries no wireName (e.g.
+ * Anthropic has no "hide thinking" request field, so `reasoning.exclude` is
+ * applied to the normalized response instead — see client/gateway.ts).
+ */
+export const GATEWAY_SIDE_PARAMS = new Set(["reasoning.exclude"]);
+
 /** `thinking.type` carries "enabled"/"disabled" strings on the wire; the unified param is boolean. */
 function wireValue(wireName: string, value: unknown): unknown {
   if (wireName === "thinking.type" && typeof value === "boolean") return value ? "enabled" : "disabled";
@@ -63,6 +70,7 @@ export function mapNativeParams(model: ResolvedModel, effectiveParams: Record<st
       warnings.push({ code: "unmapped_param", param: name, message: `${name} has no descriptor on ${model.providerId}:${model.modelId}; not sent` });
       continue;
     }
+    if (descriptor.wireName === undefined && GATEWAY_SIDE_PARAMS.has(name)) continue;
     const wireName = descriptor.wireName ?? name;
     setPath(wire, wireName, wireValue(wireName, value));
   }

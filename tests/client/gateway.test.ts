@@ -144,6 +144,80 @@ describe("gateway.chat", () => {
   });
 });
 
+describe("gateway reasoning.exclude (G1: hidden gateway-side, signatures kept)", () => {
+  const THINKING_PAYLOAD = {
+    id: "msg_2",
+    stop_reason: "end_turn",
+    content: [
+      { type: "thinking", thinking: "secret plan", signature: "sig_1" },
+      { type: "redacted_thinking", data: "opaque" },
+      { type: "text", text: "answer" }
+    ],
+    usage: { input_tokens: 2, output_tokens: 9 }
+  };
+
+  it("chat(): strips thinking text but keeps signature/redacted blocks for round-trip", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(THINKING_PAYLOAD), { status: 200 }));
+    const gateway = createGateway({ credentials: { anthropic: "sk-ant" }, fetchImpl });
+    const response = await gateway.chat({
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": true, "reasoning.exclude": true }
+    });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.thinking).toEqual({ type: "enabled", budget_tokens: 1024 });
+    expect(response.content).toEqual([
+      { type: "reasoning", text: "", signature: "sig_1" },
+      { type: "reasoning", text: "", redacted: true, data: "opaque" },
+      { type: "text", text: "answer" }
+    ]);
+  });
+
+  it("chat(): without exclude the thinking text is surfaced", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(THINKING_PAYLOAD), { status: 200 }));
+    const gateway = createGateway({ credentials: { anthropic: "sk-ant" }, fetchImpl });
+    const response = await gateway.chat({
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      messages: [{ role: "user", content: "hi" }],
+      params: { "reasoning.enabled": true }
+    });
+    expect(response.content[0]).toEqual({ type: "reasoning", text: "secret plan", signature: "sig_1" });
+  });
+
+  it("stream(): suppresses reasoning-delta events and blanks reasoning text in done", async () => {
+    const lines = [
+      { type: "message_start", message: { id: "msg_3", usage: { input_tokens: 2 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "secret" } },
+      { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig_s" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "ok" } },
+      { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 3 } },
+      { type: "message_stop" }
+    ].map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
+    const fetchImpl = vi.fn(async () => new Response(lines.join(""), { status: 200 }));
+    const gateway = createGateway({ credentials: { anthropic: "sk-ant" }, fetchImpl });
+    const events = await collect(
+      gateway.stream({
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        messages: [{ role: "user", content: "hi" }],
+        params: { "reasoning.enabled": true, "reasoning.exclude": true }
+      })
+    );
+    expect(events.some((e) => e.type === "reasoning-delta")).toBe(false);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "reasoning", text: "", signature: "sig_s" },
+      { type: "text", text: "ok" }
+    ]);
+  });
+});
+
 describe("gateway.stream", () => {
   const SSE_BODY = [
     'data: {"id":"c1","choices":[{"delta":{"content":"he"}}]}',

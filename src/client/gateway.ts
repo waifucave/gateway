@@ -7,7 +7,7 @@ import type { EncodedRequest } from "../codecs/types.js";
 import { fetchWithRetry } from "../transport/http.js";
 import { parseSse, withIdleTimeout } from "../transport/sse.js";
 import { GatewayError } from "../errors.js";
-import type { ChatRequest, ChatResponse, StreamEvent, Warning } from "./types.js";
+import type { ChatRequest, ChatResponse, ContentBlock, StreamEvent, Warning } from "./types.js";
 
 export type GatewayOptions = {
   /** providerId → API key, or a lookup function. The gateway never persists keys. */
@@ -48,6 +48,33 @@ function violationSummary(result: ValidationResult): string {
     .join("; ");
 }
 
+/**
+ * `reasoning.exclude`: hide reasoning TEXT from the normalized response while
+ * keeping whatever must round-trip (signatures, redacted data, OpenRouter
+ * details). Blocks with nothing left to replay are dropped entirely.
+ */
+function hideReasoning(content: ContentBlock[]): ContentBlock[] {
+  const out: ContentBlock[] = [];
+  for (const block of content) {
+    if (block.type !== "reasoning") {
+      out.push(block);
+      continue;
+    }
+    const { text: _text, ...rest } = block;
+    const keep = rest.signature !== undefined || rest.redacted === true || rest.data !== undefined || (rest.details?.length ?? 0) > 0;
+    if (keep) out.push({ ...rest, type: "reasoning", text: "", ...(rest.details ? { details: rest.details.map(stripDetailText) } : {}) });
+  }
+  return out;
+}
+
+function stripDetailText(detail: Record<string, unknown>): Record<string, unknown> {
+  // reasoning.text / reasoning.summary carry the readable text; signatures and
+  // encrypted data stay. OpenRouter accepts details with an empty text.
+  return "text" in detail || "summary" in detail
+    ? { ...detail, ...("text" in detail ? { text: "" } : {}), ...("summary" in detail ? { summary: "" } : {}) }
+    : detail;
+}
+
 export class Gateway {
   readonly registry: Registry;
   private readonly options: GatewayOptions;
@@ -77,7 +104,7 @@ export class Gateway {
    * normalizes both to a 499 response (see server/shared.ts errorResponse).
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const { model, encoded, warnings } = this.prepare(request, false);
+    const { model, encoded, warnings, excludeReasoning } = this.prepare(request, false);
     const response = await fetchWithRetry(model.providerId, encoded, this.transportOptions(request.signal));
     let payload: unknown;
     try {
@@ -91,6 +118,7 @@ export class Gateway {
     }
     const decoded = codecFor(model.wire).decodeResponse(model, payload);
     decoded.warnings = [...warnings, ...decoded.warnings];
+    if (excludeReasoning) decoded.content = hideReasoning(decoded.content);
     if (this.options.includeRaw) decoded.raw = payload;
     return decoded;
   }
@@ -101,7 +129,7 @@ export class Gateway {
    * Aborts mid-stream surface as an `error` event of kind "network" (see chat()'s abort contract).
    */
   async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
-    const { model, encoded, warnings } = this.prepare(request, true);
+    const { model, encoded, warnings, excludeReasoning } = this.prepare(request, true);
     // Own controller linked to the caller's signal so a stall can abort the
     // upstream fetch/body without being mistaken for a user abort.
     const upstream = new AbortController();
@@ -118,7 +146,11 @@ export class Gateway {
         return error;
       });
       for await (const event of codecFor(model.wire).decodeStream(model, parseSse(body))) {
-        if (event.type === "done") event.response.warnings = [...warnings, ...event.response.warnings];
+        if (excludeReasoning && event.type === "reasoning-delta") continue;
+        if (event.type === "done") {
+          event.response.warnings = [...warnings, ...event.response.warnings];
+          if (excludeReasoning) event.response.content = hideReasoning(event.response.content);
+        }
         yield event;
       }
     } catch (cause) {
@@ -131,7 +163,10 @@ export class Gateway {
     }
   }
 
-  private prepare(request: ChatRequest, stream: boolean): { model: ResolvedModel; encoded: EncodedRequest; warnings: Warning[] } {
+  private prepare(
+    request: ChatRequest,
+    stream: boolean
+  ): { model: ResolvedModel; encoded: EncodedRequest; warnings: Warning[]; excludeReasoning: boolean } {
     const model = this.resolveOrThrow(request.provider, request.model);
     const validation = validateRequest(model, {
       params: request.params ?? {},
@@ -163,7 +198,12 @@ export class Gateway {
       },
       apiKey
     );
-    return { model, encoded, warnings: [...toWarnings(validation.warnings), ...encoded.warnings] };
+    return {
+      model,
+      encoded,
+      warnings: [...toWarnings(validation.warnings), ...encoded.warnings],
+      excludeReasoning: validation.effectiveParams["reasoning.exclude"] === true
+    };
   }
 
   private resolveOrThrow(provider: string, model: string): ResolvedModel {

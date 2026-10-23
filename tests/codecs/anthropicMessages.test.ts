@@ -89,6 +89,65 @@ describe("anthropic-messages encode — thinking styles per family", () => {
   });
 });
 
+describe("anthropic catalog rules — thinking, sampling, exclude (G1/G7)", () => {
+  const OLDER = ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-sonnet-4-6", "claude-opus-4-6"];
+
+  it("no Claude family maps reasoning.exclude onto a (non-existent) thinking.redacted wire field", () => {
+    for (const ref of registry.listModels().filter((m) => m.company === "Anthropic" && m.providerId === "anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      expect(m.params["reasoning.exclude"]?.wireName, ref.modelId).toBeUndefined();
+      const encoded = anthropicMessagesCodec.encode(
+        m,
+        { messages: [{ role: "user", content: "hi" }], effectiveParams: validateRequest(m, { params: { "reasoning.exclude": true } }).effectiveParams, stream: false },
+        "K"
+      );
+      expect(JSON.stringify(encoded.body), ref.modelId).not.toContain("redacted");
+      expect(encoded.body).not.toHaveProperty("reasoning");
+    }
+  });
+
+  it("thinking requests carry no spurious param_forced warning (G7)", () => {
+    for (const ref of registry.listModels().filter((m) => m.company === "Anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      const result = validateRequest(m, { params: { "reasoning.enabled": true } });
+      expect(result.warnings.filter((w) => w.code === "forced"), `${ref.providerId}:${ref.modelId}`).toEqual([]);
+      expect(result.effectiveParams).not.toHaveProperty("reasoningRoundTrip");
+    }
+  });
+
+  it.each(OLDER)("%s: thinking drops temperature/top_k and clamps top_p into [0.95, 1]", (modelId) => {
+    const m = registry.resolve("anthropic", modelId)!;
+    const result = validateRequest(m, { params: { "reasoning.enabled": true, temperature: 0.7, topK: 40, topP: 0.5 } });
+    expect(result.ok, JSON.stringify(result.violations)).toBe(true);
+    expect(result.effectiveParams).not.toHaveProperty("temperature");
+    expect(result.effectiveParams).not.toHaveProperty("topK");
+    expect(result.effectiveParams.topP).toBe(0.95);
+    expect(result.warnings.map((w) => `${w.param}:${w.code}`).sort()).toEqual(["temperature:dropped", "topK:dropped", "topP:clamped"]);
+  });
+
+  it.each(OLDER)("%s: temperature and top_p together → top_p dropped (Claude 4.5+ accepts only one)", (modelId) => {
+    const m = registry.resolve("anthropic", modelId)!;
+    const result = validateRequest(m, { params: { temperature: 0.7, topP: 0.9 } });
+    expect(result.ok).toBe(true);
+    expect(result.effectiveParams.temperature).toBe(0.7);
+    expect(result.effectiveParams).not.toHaveProperty("topP");
+  });
+
+  it("without thinking, sampling params pass through untouched", () => {
+    const m = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+    const result = validateRequest(m, { params: { temperature: 0.3, topK: 10 } });
+    expect(result.warnings).toEqual([]);
+    expect(result.effectiveParams).toMatchObject({ temperature: 0.3, topK: 10 });
+  });
+
+  it("Opus 4.7+ / Sonnet 5 / Fable expose no sampling params (removed upstream: 400)", () => {
+    for (const modelId of ["claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-5", "claude-fable-5"]) {
+      const m = registry.resolve("anthropic", modelId)!;
+      for (const p of ["temperature", "topP", "topK"]) expect(m.params[p], `${modelId}.${p}`).toBeUndefined();
+    }
+  });
+});
+
 describe("anthropic-messages encode — thinking payload", () => {
   it("GOLDEN: thinking payload with budget, top-level system, reasoningRoundTrip directive skipped", () => {
     const encoded = goldenEncode({
