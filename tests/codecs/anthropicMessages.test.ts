@@ -89,6 +89,65 @@ describe("anthropic-messages encode — thinking styles per family", () => {
   });
 });
 
+describe("anthropic catalog rules — thinking, sampling, exclude (G1/G7)", () => {
+  const OLDER = ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-sonnet-4-6", "claude-opus-4-6"];
+
+  it("no Claude family maps reasoning.exclude onto a (non-existent) thinking.redacted wire field", () => {
+    for (const ref of registry.listModels().filter((m) => m.company === "Anthropic" && m.providerId === "anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      expect(m.params["reasoning.exclude"]?.wireName, ref.modelId).toBeUndefined();
+      const encoded = anthropicMessagesCodec.encode(
+        m,
+        { messages: [{ role: "user", content: "hi" }], effectiveParams: validateRequest(m, { params: { "reasoning.exclude": true } }).effectiveParams, stream: false },
+        "K"
+      );
+      expect(JSON.stringify(encoded.body), ref.modelId).not.toContain("redacted");
+      expect(encoded.body).not.toHaveProperty("reasoning");
+    }
+  });
+
+  it("thinking requests carry no spurious param_forced warning (G7)", () => {
+    for (const ref of registry.listModels().filter((m) => m.company === "Anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      const result = validateRequest(m, { params: { "reasoning.enabled": true } });
+      expect(result.warnings.filter((w) => w.code === "forced"), `${ref.providerId}:${ref.modelId}`).toEqual([]);
+      expect(result.effectiveParams).not.toHaveProperty("reasoningRoundTrip");
+    }
+  });
+
+  it.each(OLDER)("%s: thinking drops temperature/top_k and clamps top_p into [0.95, 1]", (modelId) => {
+    const m = registry.resolve("anthropic", modelId)!;
+    const result = validateRequest(m, { params: { "reasoning.enabled": true, temperature: 0.7, topK: 40, topP: 0.5 } });
+    expect(result.ok, JSON.stringify(result.violations)).toBe(true);
+    expect(result.effectiveParams).not.toHaveProperty("temperature");
+    expect(result.effectiveParams).not.toHaveProperty("topK");
+    expect(result.effectiveParams.topP).toBe(0.95);
+    expect(result.warnings.map((w) => `${w.param}:${w.code}`).sort()).toEqual(["temperature:dropped", "topK:dropped", "topP:clamped"]);
+  });
+
+  it.each(OLDER)("%s: temperature and top_p together → top_p dropped (Claude 4.5+ accepts only one)", (modelId) => {
+    const m = registry.resolve("anthropic", modelId)!;
+    const result = validateRequest(m, { params: { temperature: 0.7, topP: 0.9 } });
+    expect(result.ok).toBe(true);
+    expect(result.effectiveParams.temperature).toBe(0.7);
+    expect(result.effectiveParams).not.toHaveProperty("topP");
+  });
+
+  it("without thinking, sampling params pass through untouched", () => {
+    const m = registry.resolve("anthropic", "claude-haiku-4-5-20251001")!;
+    const result = validateRequest(m, { params: { temperature: 0.3, topK: 10 } });
+    expect(result.warnings).toEqual([]);
+    expect(result.effectiveParams).toMatchObject({ temperature: 0.3, topK: 10 });
+  });
+
+  it("Opus 4.7+ / Sonnet 5 / Fable expose no sampling params (removed upstream: 400)", () => {
+    for (const modelId of ["claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-5", "claude-fable-5"]) {
+      const m = registry.resolve("anthropic", modelId)!;
+      for (const p of ["temperature", "topP", "topK"]) expect(m.params[p], `${modelId}.${p}`).toBeUndefined();
+    }
+  });
+});
+
 describe("anthropic-messages encode — thinking payload", () => {
   it("GOLDEN: thinking payload with budget, top-level system, reasoningRoundTrip directive skipped", () => {
     const encoded = goldenEncode({
@@ -220,7 +279,9 @@ describe("anthropic-messages encode — messages & tools", () => {
     expect(named.body.tool_choice).toEqual({ type: "tool", name: "pick" });
   });
 
-  it("throws invalid_request for responseFormat (not implemented on this wire)", () => {
+  it("throws invalid_request for json_object (Anthropic has no JSON mode; jsonMode is false in the catalog)", () => {
+    expect(model.features.structuredOutput.jsonMode).toBe(false);
+    expect(validateRequest(model, { params: {}, responseFormat: "json_object" }).ok).toBe(false);
     expect(() =>
       anthropicMessagesCodec.encode(
         model,
@@ -228,6 +289,127 @@ describe("anthropic-messages encode — messages & tools", () => {
         "TEST_KEY"
       )
     ).toThrow(GatewayError);
+  });
+
+  it("GOLDEN: json_schema → native output_config.format (G6), objects closed, unsupported constraints moved to descriptions", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        reply: { type: "string", maxLength: 200, description: "the reply" },
+        score: { type: "integer", minimum: 0, maximum: 10 },
+        tags: { type: "array", items: { type: "object", properties: { t: { type: "string" } }, required: ["t"] } }
+      },
+      required: ["reply", "score", "tags"]
+    };
+    const encoded = anthropicMessagesCodec.encode(
+      model,
+      { messages: [{ role: "user", content: "hi" }], responseFormat: { type: "json_schema", name: "decision", schema }, effectiveParams: {}, stream: false },
+      "TEST_KEY"
+    );
+    expect(encoded.body.output_config).toEqual({
+      format: {
+        type: "json_schema",
+        schema: {
+          type: "object",
+          properties: {
+            reply: { type: "string", description: "the reply (maxLength: 200)" },
+            score: { type: "integer", description: "(minimum: 0, maximum: 10)" },
+            tags: {
+              type: "array",
+              items: { type: "object", properties: { t: { type: "string" } }, required: ["t"], additionalProperties: false }
+            }
+          },
+          required: ["reply", "score", "tags"],
+          additionalProperties: false
+        }
+      }
+    });
+    expect(encoded.body).not.toHaveProperty("tools");
+    // the caller's schema object is never mutated
+    expect(schema.properties.reply).toEqual({ type: "string", maxLength: 200, description: "the reply" });
+  });
+
+  it("forces additionalProperties:false on every object, overriding other values", () => {
+    const encoded = anthropicMessagesCodec.encode(
+      model,
+      {
+        messages: [{ role: "user", content: "hi" }],
+        responseFormat: {
+          type: "json_schema",
+          schema: { type: "object", additionalProperties: true, properties: { m: { type: "object", additionalProperties: { type: "string" } } } }
+        },
+        effectiveParams: {},
+        stream: false
+      },
+      "K"
+    );
+    expect((encoded.body.output_config as { format: { schema: unknown } }).format.schema).toEqual({
+      type: "object",
+      additionalProperties: false,
+      properties: { m: { type: "object", additionalProperties: false } }
+    });
+  });
+
+  it("drops unsigned thinking blocks (e.g. from another provider) with a warning instead of a 400", () => {
+    const encoded = goldenEncode({
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "reasoning", text: "deepseek-style thoughts" },
+            { type: "reasoning", text: "signed", signature: "sig" },
+            { type: "reasoning", text: "", redacted: true, data: "opaque" },
+            { type: "text", text: "answer" }
+          ]
+        },
+        { role: "user", content: "next" }
+      ]
+    });
+    expect((encoded.body.messages as Array<{ content: unknown[] }>)[1]!.content).toEqual([
+      { type: "thinking", thinking: "signed", signature: "sig" },
+      { type: "redacted_thinking", data: "opaque" },
+      { type: "text", text: "answer" }
+    ]);
+    expect(encoded.warnings).toContainEqual({
+      code: "content_dropped",
+      param: "messages[1].content[0]",
+      message: "reasoning block without a signature cannot be replayed to anthropic; dropped"
+    });
+  });
+
+  it("json_schema merges with effort inside output_config", () => {
+    const sonnet5 = registry.resolve("anthropic", "claude-sonnet-5")!;
+    const validation = validateRequest(sonnet5, { params: { "reasoning.effort": "low" }, responseFormat: "json_schema" });
+    expect(validation.ok, JSON.stringify(validation.violations)).toBe(true);
+    const encoded = anthropicMessagesCodec.encode(
+      sonnet5,
+      {
+        messages: [{ role: "user", content: "hi" }],
+        responseFormat: { type: "json_schema", schema: { type: "object", properties: {} } },
+        effectiveParams: validation.effectiveParams,
+        stream: false
+      },
+      "TEST_KEY"
+    );
+    expect(encoded.body.output_config).toEqual({
+      effort: "low",
+      format: { type: "json_schema", schema: { type: "object", properties: {}, additionalProperties: false } }
+    });
+  });
+
+  it("every Claude family that advertises jsonSchema encodes it without throwing", () => {
+    for (const ref of registry.listModels().filter((m) => m.providerId === "anthropic")) {
+      const m = registry.resolve(ref.providerId, ref.modelId)!;
+      expect(m.features.structuredOutput.jsonSchema).toBe(true);
+      expect(() =>
+        anthropicMessagesCodec.encode(
+          m,
+          { messages: [{ role: "user", content: "hi" }], responseFormat: { type: "json_schema", schema: { type: "object" } }, effectiveParams: {}, stream: false },
+          "K"
+        )
+      ).not.toThrow();
+    }
   });
 
   it("drops empty text blocks and empty turns (Anthropic rejects empty content)", () => {
@@ -267,8 +449,31 @@ describe("anthropic-messages decodeResponse", () => {
         { type: "toolCall", id: "toolu_9", name: "lookup", arguments: '{"q":"x"}' }
       ],
       finishReason: "tool_calls",
-      usage: { inputTokens: 12, outputTokens: 7, cachedInputTokens: 5 },
+      // inputTokens = uncached 12 + cache read 5 (total prompt, G10)
+      usage: { inputTokens: 17, outputTokens: 7, cacheReadTokens: 5, cachedInputTokens: 5 },
       warnings: []
+    });
+  });
+
+  it("normalizes usage: input = input_tokens + cache_read + cache_creation; 1h writes broken out (G10)", () => {
+    const response = anthropicMessagesCodec.decodeResponse(model, {
+      stop_reason: "end_turn",
+      content: [],
+      usage: {
+        input_tokens: 10,
+        cache_read_input_tokens: 100,
+        cache_creation_input_tokens: 20,
+        cache_creation: { ephemeral_5m_input_tokens: 5, ephemeral_1h_input_tokens: 15 },
+        output_tokens: 7
+      }
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 130,
+      outputTokens: 7,
+      cacheReadTokens: 100,
+      cacheWriteTokens: 20,
+      cacheWrite1hTokens: 15,
+      cachedInputTokens: 100
     });
   });
 
@@ -287,6 +492,8 @@ describe("anthropic-messages decodeResponse", () => {
     expect(stop("end_turn")).toBe("stop");
     expect(stop("stop_sequence")).toBe("stop");
     expect(stop("max_tokens")).toBe("length");
+    // generation ran into the context window: a token limit, not an error
+    expect(stop("model_context_window_exceeded")).toBe("length");
   });
 });
 
@@ -332,6 +539,31 @@ describe("anthropic-messages decodeStream", () => {
         }
       }
     ]);
+  });
+
+  it("stream usage sums cache reads/writes into inputTokens and prefers message_delta's cumulative counts", async () => {
+    const events = await collect(
+      anthropicMessagesCodec.decodeStream(
+        model,
+        sse([
+          {
+            event: "message_start",
+            data: '{"type":"message_start","message":{"id":"m","usage":{"input_tokens":4,"cache_read_input_tokens":50,"cache_creation_input_tokens":6,"output_tokens":1}}}'
+          },
+          { event: "content_block_start", data: '{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' },
+          { event: "content_block_delta", data: '{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}}' },
+          {
+            event: "message_delta",
+            data: '{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":4,"cache_read_input_tokens":50,"cache_creation_input_tokens":6,"output_tokens":12}}'
+          },
+          { event: "message_stop", data: '{"type":"message_stop"}' }
+        ])
+      )
+    );
+    expect(events.find((e) => e.type === "usage")).toEqual({
+      type: "usage",
+      usage: { inputTokens: 60, outputTokens: 12, cacheReadTokens: 50, cacheWriteTokens: 6, cachedInputTokens: 50 }
+    });
   });
 
   it("synthesizes a done event when the stream truncates before message_stop", async () => {

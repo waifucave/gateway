@@ -82,6 +82,8 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STEPFUN_API_KEY: ${{ secrets.STEPFUN_API_KEY }}
           XIAOMI_API_KEY: ${{ secrets.XIAOMI_API_KEY }}
+          # Meta Model API (provider "meta") reads MODEL_API_KEY — see src/registry/providers.ts
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
         run: node dist/bin/gateway.js sync
 
   publish-freshness:

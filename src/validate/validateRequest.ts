@@ -1,4 +1,6 @@
 import { ParamDescriptor, ResolvedModel } from "../registry/types.js";
+import type { ChatMessage } from "../client/types.js";
+import { hasCacheMarker } from "../codecs/shared.js";
 import { applyConstraints, ConstraintViolation, ConstraintWarning } from "./constraints.js";
 
 export type ValidateInput = {
@@ -6,6 +8,12 @@ export type ValidateInput = {
   toolChoice?: "auto" | "none" | "required" | { name: string };
   responseFormat?: "json_object" | "json_schema";
   stream?: boolean;
+  /**
+   * Optional conversation: when given, content is checked against the model's
+   * input modalities (images on a text-only model are a violation here; the
+   * chat path instead strips them with a `content_dropped` warning).
+   */
+  messages?: ChatMessage[];
 };
 
 export type ValidationViolation =
@@ -13,7 +21,7 @@ export type ValidationViolation =
   | {
       ruleId?: undefined;
       param: string;
-      code: "unknown_param" | "wrong_type" | "out_of_range" | "bad_enum" | "max_items" | "unsupported_tool_choice" | "unsupported_response_format" | "unsupported_stream";
+      code: "unknown_param" | "wrong_type" | "out_of_range" | "bad_enum" | "max_items" | "unsupported_tool_choice" | "unsupported_response_format" | "unsupported_stream" | "unsupported_modality" | "unsupported_prompt_caching";
       message: string;
     };
 
@@ -66,6 +74,19 @@ function checkDescriptor(name: string, value: unknown, d: ParamDescriptor): Vali
   }
 }
 
+/** `messages[i].content[j]` paths of image blocks the model cannot take (empty when it lists "image" input). */
+export function unsupportedImageBlocks(model: ResolvedModel, messages: ChatMessage[] | undefined): string[] {
+  if (!messages || model.modalities.input.includes("image")) return [];
+  const out: string[] = [];
+  messages.forEach((message, i) => {
+    if (message.role !== "user" || typeof message.content === "string") return;
+    message.content.forEach((block, j) => {
+      if (block.type === "image") out.push(`messages[${i}].content[${j}]`);
+    });
+  });
+  return out;
+}
+
 export function validateRequest(model: ResolvedModel, input: ValidateInput): ValidationResult {
   const violations: ValidationViolation[] = [];
 
@@ -97,6 +118,20 @@ export function validateRequest(model: ResolvedModel, input: ValidateInput): Val
   }
   if (input.stream && !model.features.streaming) {
     violations.push({ param: "stream", code: "unsupported_stream", message: "streaming is not supported" });
+  }
+  if (model.features.promptCaching.kind === "none" && input.messages?.some(hasCacheMarker)) {
+    violations.push({
+      param: "cacheControl",
+      code: "unsupported_prompt_caching",
+      message: `${model.providerId}:${model.modelId} does not support prompt caching`
+    });
+  }
+  for (const location of unsupportedImageBlocks(model, input.messages)) {
+    violations.push({
+      param: location,
+      code: "unsupported_modality",
+      message: `image input is not supported by ${model.providerId}:${model.modelId}`
+    });
   }
 
   // 3. effective params = defaults ∪ user params (+ normalized toolChoice/responseFormat for rules)

@@ -1,6 +1,7 @@
 import { GatewayError } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
 import type {
+  CacheControl,
   ChatMessage,
   ChatResponse,
   ContentBlock,
@@ -9,11 +10,25 @@ import type {
   StreamEvent,
   TextBlock,
   ToolCallBlock,
-  Usage
+  Usage,
+  Warning
 } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, mapOpenRouterParams, pruneUndefined } from "./shared.js";
+import { normalizeUsage } from "../client/usage.js";
+import {
+  applyPassthrough,
+  authHeaders,
+  buildUrl,
+  enforceCacheBreakpoints,
+  hasCacheMarker,
+  mapNativeParams,
+  mapOpenRouterParams,
+  pruneUndefined,
+  supportsPromptCacheKey,
+  systemText,
+  wireCacheControl
+} from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
   stop: "stop",
@@ -23,13 +38,22 @@ const FINISH_REASONS: Record<string, FinishReason> = {
 };
 
 type WireUsage = {
+  /** Total prompt tokens (cached included) on every OpenAI-compatible provider. */
   prompt_tokens?: number;
+  /** Total completion tokens (reasoning included). */
   completion_tokens?: number;
   completion_tokens_details?: { reasoning_tokens?: number };
-  prompt_tokens_details?: { cached_tokens?: number };
+  /** OpenRouter adds cache_write_tokens next to OpenAI's cached_tokens. */
+  prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
   /** DeepSeek's cache-hit counter. */
   prompt_cache_hit_tokens?: number;
+  /** Moonshot's cache-hit counter. */
+  cached_tokens?: number;
+  /** OpenRouter: USD charged for this generation. */
+  cost?: number;
 };
+
+type ReasoningDetail = Record<string, unknown>;
 
 type WirePayload = {
   id?: string;
@@ -37,6 +61,10 @@ type WirePayload = {
     message?: {
       content?: string | null;
       reasoning_content?: string | null;
+      /** OpenRouter's normalized reasoning text. */
+      reasoning?: string | null;
+      /** OpenRouter's structured reasoning (text/summary/encrypted, with signatures). */
+      reasoning_details?: ReasoningDetail[] | null;
       tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
     };
     finish_reason?: string | null;
@@ -51,6 +79,8 @@ type StreamChunk = {
     delta?: {
       content?: string | null;
       reasoning_content?: string | null;
+      reasoning?: string | null;
+      reasoning_details?: ReasoningDetail[] | null;
       tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }>;
     };
     finish_reason?: string | null;
@@ -58,53 +88,150 @@ type StreamChunk = {
 };
 
 function decodeUsage(usage: WireUsage | null | undefined): Usage {
-  return pruneUndefined({
+  return normalizeUsage({
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
-    cachedInputTokens: usage?.prompt_tokens_details?.cached_tokens ?? usage?.prompt_cache_hit_tokens
+    cacheReadTokens: usage?.prompt_tokens_details?.cached_tokens ?? usage?.prompt_cache_hit_tokens ?? usage?.cached_tokens,
+    cacheWriteTokens: usage?.prompt_tokens_details?.cache_write_tokens,
+    costUsd: usage?.cost
   });
 }
 
-function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): Array<Record<string, unknown>> {
+/** Readable text carried by reasoning_details when no plain `reasoning` string accompanies them. */
+function detailsText(details: ReasoningDetail[]): string {
+  return details
+    .map((detail) => (typeof detail.text === "string" ? detail.text : typeof detail.summary === "string" ? detail.summary : ""))
+    .join("");
+}
+
+/**
+ * Merge streamed reasoning_details fragments: fragments sharing an `index`
+ * (and type) belong to one detail — string payload fields concatenate,
+ * everything else is last-write-wins. Fragments without an index append.
+ */
+function mergeDetails(into: ReasoningDetail[], fragments: ReasoningDetail[]): void {
+  for (const fragment of fragments) {
+    if (fragment === null || typeof fragment !== "object") continue;
+    const existing =
+      typeof fragment.index === "number"
+        ? into.find((d) => d.index === fragment.index && (fragment.type === undefined || d.type === fragment.type))
+        : undefined;
+    if (!existing) {
+      into.push({ ...fragment });
+      continue;
+    }
+    for (const [key, value] of Object.entries(fragment)) {
+      if (["text", "summary", "data", "signature"].includes(key) && typeof value === "string" && typeof existing[key] === "string") {
+        existing[key] = (existing[key] as string) + value;
+      } else if (value !== undefined && value !== null) {
+        existing[key] = value;
+      }
+    }
+  }
+}
+
+function reasoningBlock(text: string, details: ReasoningDetail[]): ReasoningBlock | undefined {
+  if (text === "" && details.length === 0) return undefined;
+  return details.length > 0 ? { type: "reasoning", text, details } : { type: "reasoning", text };
+}
+
+/**
+ * OpenRouter forwards `cache_control` on content parts to Anthropic and Gemini
+ * upstreams (content must then be an array of parts). Every other
+ * OpenAI-compatible route caches implicitly — markers are simply not sent.
+ */
+function usesCacheHints(model: ResolvedModel): boolean {
+  return model.providerId === "openrouter" && (model.company === "Anthropic" || model.company === "Google") && model.features.promptCaching.kind === "explicit";
+}
+
+type WirePart = Record<string, unknown>;
+
+function textPart(block: TextBlock, hints: boolean): WirePart {
+  return hints && block.cacheControl ? { type: "text", text: block.text, cache_control: wireCacheControl(block.cacheControl) } : { type: "text", text: block.text };
+}
+
+/** Message-level breakpoint → last text part (else the last part). */
+function markLastPart(parts: WirePart[], cacheControl: CacheControl | undefined): void {
+  if (!cacheControl || parts.length === 0) return;
+  let index = parts.length - 1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (parts[i]!.type === "text") {
+      index = i;
+      break;
+    }
+  }
+  parts[index] = { ...parts[index]!, cache_control: wireCacheControl(cacheControl) };
+}
+
+/** String content with a breakpoint becomes a single marked text part. */
+function markedText(text: string, cacheControl: CacheControl | undefined, hints: boolean): string | WirePart[] {
+  return hints && cacheControl ? [{ type: "text", text, cache_control: wireCacheControl(cacheControl) }] : text;
+}
+
+function encodeMessages(model: ResolvedModel, messages: ChatMessage[], warnings: Warning[]): Array<Record<string, unknown>> {
+  const openrouter = model.providerId === "openrouter";
+  const hints = usesCacheHints(model);
   const out: Array<Record<string, unknown>> = [];
   for (const message of messages) {
     if (message.role === "system") {
-      out.push({ role: "system", content: message.content });
+      if (hints && hasCacheMarker(message) && Array.isArray(message.content)) {
+        const parts = message.content.map((block) => textPart(block, hints));
+        markLastPart(parts, message.cacheControl);
+        out.push({ role: "system", content: parts });
+      } else {
+        out.push({ role: "system", content: markedText(systemText(message.content), message.cacheControl, hints) });
+      }
     } else if (message.role === "tool") {
-      out.push({ role: "tool", tool_call_id: message.toolCallId, content: message.content });
+      out.push({ role: "tool", tool_call_id: message.toolCallId, content: markedText(message.content, message.cacheControl, hints) });
     } else if (message.role === "user") {
-      out.push({
-        role: "user",
-        content:
-          typeof message.content === "string"
-            ? message.content
-            : message.content.map((block) =>
-                block.type === "text"
-                  ? { type: "text", text: block.text }
-                  : { type: "image_url", image_url: { url: `data:${block.mimeType};base64,${block.data}` } }
-              )
-      });
+      if (typeof message.content === "string") {
+        out.push({ role: "user", content: markedText(message.content, message.cacheControl, hints) });
+        continue;
+      }
+      const parts = message.content.map((block) =>
+        block.type === "text" ? textPart(block, hints) : { type: "image_url", image_url: { url: `data:${block.mimeType};base64,${block.data}` } }
+      );
+      if (hints) markLastPart(parts, message.cacheControl);
+      out.push({ role: "user", content: parts });
     } else if (typeof message.content === "string") {
-      out.push({ role: "assistant", content: message.content });
+      out.push({ role: "assistant", content: markedText(message.content, message.cacheControl, hints) });
     } else {
       // Text blocks are joined into the single wire `content` string; text/toolCall
       // interleaving cannot be represented on this wire and is intentionally lost.
       const text = message.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("");
-      const reasoning = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning").map((b) => b.text).join("");
+      const reasoningBlocks = message.content.filter((b): b is ReasoningBlock => b.type === "reasoning");
+      const reasoning = reasoningBlocks.map((b) => b.replay ?? b.text).join("");
+      const details = reasoningBlocks.flatMap((b) => b.details ?? []);
       const toolCalls = message.content.filter((b): b is ToolCallBlock => b.type === "toolCall");
+      // OpenRouter: replay reasoning_details verbatim (carries Anthropic signatures /
+      // Gemini thought signatures / OpenAI encrypted reasoning) on tool-call turns,
+      // or on any turn when the family requires reasoning round-trip. Native
+      // routes keep the DeepSeek-style reasoning_content field.
+      const replay = toolCalls.length > 0 || model.features.reasoningRoundTrip === true;
+      const marker = message.cacheControl ?? message.content.find((b): b is TextBlock => b.type === "text" && b.cacheControl !== undefined)?.cacheControl;
+      if (hints && marker && text === "") {
+        warnings.push({ code: "cache_ignored", param: "cacheControl", message: "cache breakpoint on an assistant turn without text was ignored" });
+      }
       out.push(
         pruneUndefined({
           role: "assistant",
           // content:null is only valid alongside tool_calls; otherwise the wire requires a string
-          content: text !== "" ? text : toolCalls.length ? null : "",
+          content: text !== "" ? markedText(text, marker, hints) : toolCalls.length ? null : "",
           tool_calls: toolCalls.length
             ? toolCalls.map((call) => ({ id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } }))
             : undefined,
-          reasoning_content: reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined
+          reasoning_details: openrouter && replay && details.length > 0 ? details : undefined,
+          reasoning:
+            openrouter && details.length === 0 && reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined,
+          reasoning_content: !openrouter && reasoning !== "" && model.features.reasoningRoundTrip ? reasoning : undefined
         })
       );
     }
+  }
+  if (hints && model.company === "Anthropic") {
+    const parts = out.flatMap((message) => (Array.isArray(message.content) ? (message.content as WirePart[]) : []));
+    enforceCacheBreakpoints(parts, model.providerId, warnings);
   }
   return out;
 }
@@ -113,7 +240,9 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const mapped = model.providerId === "openrouter" ? mapOpenRouterParams(model, request.effectiveParams) : mapNativeParams(model, request.effectiveParams);
   const warnings = [...mapped.warnings];
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
-  body.messages = encodeMessages(model, request.messages);
+  body.messages = encodeMessages(model, request.messages, warnings);
+  // OpenAI routes cache automatically; prompt_cache_key steers requests sharing a prefix to the same cache.
+  if (request.promptCacheKey !== undefined && supportsPromptCacheKey(model)) body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) => ({
       type: "function",
@@ -141,7 +270,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     body.stream = true;
     if (model.features.streamingUsage) body.stream_options = { include_usage: true };
   }
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 
@@ -154,9 +283,15 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
   }
   const message = choice.message ?? {};
   const content: ContentBlock[] = [];
-  if (typeof message.reasoning_content === "string" && message.reasoning_content !== "") {
-    content.push({ type: "reasoning", text: message.reasoning_content });
-  }
+  const details = Array.isArray(message.reasoning_details) ? message.reasoning_details.filter((d) => d !== null && typeof d === "object") : [];
+  const reasoningText =
+    typeof message.reasoning_content === "string" && message.reasoning_content !== ""
+      ? message.reasoning_content
+      : typeof message.reasoning === "string" && message.reasoning !== ""
+        ? message.reasoning
+        : detailsText(details);
+  const reasoning = reasoningBlock(reasoningText, details);
+  if (reasoning) content.push(reasoning);
   if (typeof message.content === "string" && message.content !== "") {
     content.push({ type: "text", text: message.content });
   }
@@ -180,7 +315,32 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   let usage: Usage = { inputTokens: 0, outputTokens: 0 };
   let text = "";
   let reasoning = "";
+  let sawReasoningString = false;
+  const details: ReasoningDetail[] = [];
   const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+  // Dense slot per streamed call. Providers key deltas by `index` (possibly
+  // sparse); some omit it and repeat the `id` instead — and a bare
+  // continuation (no index, no id) belongs to the most recent call.
+  const slotByIndex = new Map<number, number>();
+  const slotById = new Map<string, number>();
+  // A known index with a DIFFERENT non-empty id is a new call: Gemini's
+  // OpenAI-compat layer sends every parallel call as index 0 with distinct ids.
+  const toolCallSlot = (call: { index?: number; id?: string }): number => {
+    let slot = call.id ? slotById.get(call.id) : undefined;
+    if (slot === undefined && call.index !== undefined) {
+      const byIndex = slotByIndex.get(call.index);
+      const existingId = byIndex !== undefined ? toolCalls[byIndex]!.id : "";
+      if (byIndex !== undefined && !(call.id && existingId !== "" && existingId !== call.id)) slot = byIndex;
+    }
+    if (slot === undefined && call.index === undefined && !call.id && toolCalls.length > 0) slot = toolCalls.length - 1;
+    if (slot === undefined) {
+      slot = toolCalls.length;
+      toolCalls.push({ id: "", name: "", arguments: "" });
+    }
+    if (call.index !== undefined) slotByIndex.set(call.index, slot);
+    if (call.id) slotById.set(call.id, slot);
+    return slot;
+  };
 
   for await (const event of events) {
     if (event.data === "[DONE]") break;
@@ -199,17 +359,30 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     if (!choice) continue;
     if (choice.finish_reason) finishReason = FINISH_REASONS[choice.finish_reason] ?? "error";
     const delta = choice.delta ?? {};
-    if (typeof delta.reasoning_content === "string" && delta.reasoning_content !== "") {
-      reasoning += delta.reasoning_content;
-      yield { type: "reasoning-delta", text: delta.reasoning_content };
+    // DeepSeek spells it reasoning_content; OpenRouter re-exports the same channel as
+    // `reasoning` (plus structured reasoning_details, kept for round-trip). Deltas come
+    // from the strings; details only contribute text when no string channel exists.
+    const reasoningDelta =
+      typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : undefined;
+    if (reasoningDelta !== undefined) sawReasoningString = true;
+    if (reasoningDelta) {
+      reasoning += reasoningDelta;
+      yield { type: "reasoning-delta", text: reasoningDelta };
+    }
+    if (Array.isArray(delta.reasoning_details) && delta.reasoning_details.length > 0) {
+      mergeDetails(details, delta.reasoning_details);
+      const fragmentText = detailsText(delta.reasoning_details);
+      if (!sawReasoningString && fragmentText !== "") {
+        reasoning += fragmentText;
+        yield { type: "reasoning-delta", text: fragmentText };
+      }
     }
     if (typeof delta.content === "string" && delta.content !== "") {
       text += delta.content;
       yield { type: "text-delta", text: delta.content };
     }
     for (const call of delta.tool_calls ?? []) {
-      const index = call.index ?? 0;
-      while (toolCalls.length <= index) toolCalls.push({ id: "", name: "", arguments: "" });
+      const index = toolCallSlot(call);
       const entry = toolCalls[index]!;
       if (call.id) entry.id = call.id;
       if (call.function?.name) entry.name = call.function.name;
@@ -226,7 +399,8 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   }
 
   const content: ContentBlock[] = [];
-  if (reasoning !== "") content.push({ type: "reasoning", text: reasoning });
+  const reasoningOut = reasoningBlock(reasoning, details);
+  if (reasoningOut) content.push(reasoningOut);
   if (text !== "") content.push({ type: "text", text });
   toolCalls.forEach((call, index) => {
     content.push({ type: "toolCall", id: call.id || `call_${index}`, name: call.name, arguments: call.arguments || "{}" });

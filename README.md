@@ -1,6 +1,6 @@
 # @waifucave/gateway
 
-Provider-agnostic LLM normalization layer: a curated capability registry for 77 model families (146 routes) across 20 companies, per-model parameter validation with declarative quirk constraints, a unified chat API over OpenRouter + 14 direct providers, an HTTP gateway server, and a drift-sync CLI.
+Provider-agnostic LLM normalization layer: a curated capability registry for 76 model families (146 routes) across 20 companies, per-model parameter validation with declarative quirk constraints, a unified chat API over OpenRouter + 14 direct providers, an HTTP gateway server, and a drift-sync CLI.
 
 **Status: P1c complete.** Registry, validation engine, the four wire codecs, transport, and the client are complete. HTTP server (`createGatewayHandler`, `serve`), Fastify plugin (`@waifucave/gateway/fastify`), and the `gateway serve` / `gateway sync` CLI commands are all shipped.
 
@@ -69,6 +69,100 @@ Validation runs before any network call: unsupported parameters throw
 `GatewayError("unsupported_parameter")` naming the violated rule; constraint
 `drop`/`force`/`clamp` adjustments surface as `response.warnings`.
 
+**Content gating.** `gateway.validate(provider, model, { params, messages })`
+reports image blocks sent to a model whose input modalities lack `image`
+(`unsupported_modality`) and cache breakpoints on a model with
+`promptCaching.kind: "none"` (`unsupported_prompt_caching`). The chat path is
+lenient for the same cases: images are stripped (`content_dropped` warning; an
+emptied user turn becomes `"[image omitted]"`) and cache hints are not sent
+(`cache_ignored` warning) — mirroring how constraint `drop`s are warnings.
+
+**Passthrough** keys are merged raw into the wire body (one `passthrough`
+warning each). Object values deep-merge into what the codec wrote; core keys
+each codec owns (`model`, `messages`/`input`/`contents`, `system`, `tools`,
+`tool_choice`, `stream`, `response_format`, …) are rejected with
+`invalid_request` — see `CORE_BODY_KEYS`.
+
+**`reasoning.exclude` hides reasoning from display only — it is NOT a privacy
+feature.** The gateway emits no `reasoning-delta` events and empties `text` on
+reasoning blocks, but signed thinking must replay unmodified, so the original
+text is still carried in `ReasoningBlock.replay` (and OpenRouter `details`,
+signatures, redacted data stay as-is; the raw provider payload with
+`includeRaw` contains it too). Never display `replay`; pass reasoning blocks
+back unchanged on tool loops. The flag is applied gateway-side on every route —
+it is not forwarded to OpenRouter, which would otherwise stop returning the
+`reasoning_details` needed for round-trip. Unsigned reasoning blocks (e.g. from
+another provider after a model switch) are dropped with a `content_dropped`
+warning when replayed to Anthropic.
+
+### Usage and cost
+
+One convention for every provider (`Usage`):
+
+| Field | Meaning |
+|-------|---------|
+| `inputTokens` | the whole prompt, **including** cache reads and writes (Anthropic: `input_tokens + cache_read + cache_creation`) |
+| `outputTokens` | all generated tokens, **including** reasoning (Gemini: candidates + thoughts) |
+| `cacheReadTokens` / `cacheWriteTokens` / `cacheWrite1hTokens` | subsets of `inputTokens` (1h = Anthropic 1-hour TTL writes) |
+| `reasoningTokens` | subset of `outputTokens` when the provider reports it |
+| `costUsd` | OpenRouter's reported `usage.cost`, else computed from catalog pricing (`computeCostUsd`); absent when pricing is unknown |
+| `cachedInputTokens` | deprecated alias of `cacheReadTokens` |
+
+Pricing (`meta.pricing` / route `overrides.pricing`, USD per MTok) carries
+`inputPerMTok`, `outputPerMTok`, `cachedInputPerMTok` (cache read),
+`cacheWritePerMTok` and `cacheWrite1hPerMTok`; a cache tier without a price is
+costed at the input price.
+
+### Prompt caching
+
+```ts
+await gateway.chat({
+  provider: "anthropic",
+  model: "claude-sonnet-4-6",
+  promptCacheKey: "waifu:aria:chan-123",            // OpenAI prompt_cache_key
+  messages: [
+    { role: "system", content: harness, cacheControl: { type: "ephemeral", ttl: "1h" } }, // A
+    { role: "user", content: epochHeader, cacheControl: { type: "ephemeral" } },         // B
+    ...transcript.slice(0, -1),
+    { ...transcript.at(-1)!, cacheControl: { type: "ephemeral" } },                     // C (rolling)
+    { role: "user", content: ephemeralTail }
+  ]
+});
+```
+
+`cacheControl` on a message marks its last block; `TextBlock.cacheControl`
+marks one block (system content may be `TextBlock[]`). Per wire:
+
+| Wire / route | Effect |
+|--------------|--------|
+| Anthropic | `cache_control` on the marked block (never on thinking blocks); max 4 — the earliest extras are dropped with a `cache_ignored` warning; a 1h breakpoint after a 5m one is downgraded |
+| OpenRouter → Anthropic / Gemini models | `cache_control` on content parts (string content becomes a one-part array) |
+| OpenRouter → other models, native OpenAI-compatible providers | markers ignored (implicit caching) |
+| OpenAI (provider `openai`) | `prompt_cache_key` = `promptCacheKey`; markers ignored (no other provider/route receives the key) |
+| Google | no-op (implicit caching) |
+
+`features.promptCaching.kind` (also `promptCaching` in `/v1/models`) says which
+applies: `explicit` honours breakpoints, `implicit` caches automatically,
+`none` ignores hints (and `validate()` flags them).
+
+### Errors
+
+`GatewayError` carries `kind`, `retryable`, `status`, `provider`. Kinds:
+`auth`, `rate_limit`, `quota` (usage quota exhausted: `insufficient_quota`,
+Gemini per-day quota), `billing` (HTTP 402, credit balance too low),
+`context_overflow` (prompt exceeds the context window — compact and retry),
+`invalid_request`, `unsupported_parameter`, `content_filter`, `timeout`,
+`server`, `network`. Quota/billing 429s are classified from the body before the
+retry decision and never retried.
+
+**Streams** abort with a `timeout` error event when no bytes arrive for
+`streamIdleTimeoutMs`. Default 60 s, or 180 s when the request reasons
+(`reasoning.enabled`, a `reasoning.effort` other than `none`, or an always-on
+thinking model) since hidden high-effort reasoning can stream nothing for
+minutes. An explicit value applies to every stream; `0` disables. Finish reasons:
+`stop`, `length` (token limit — including OpenAI `response.incomplete`),
+`tool_calls`, `content_filter`, `error`.
+
 **Abort contract:** `chat()` rejects with the raw abort reason (not a `GatewayError`) when `request.signal` fires — user aborts stay distinguishable from provider failures. `stream()` differs: mid-stream aborts arrive as a final `error` event of kind `"network"`. The HTTP layer normalizes both to a 499 response.
 
 ## HTTP API
@@ -115,7 +209,7 @@ await app.register(gatewayPlugin, { prefix: "/api/llm", credentials: (id) => loo
 | GET | `/v1/models` | All routes with summary flags (streaming, tools, reasoning, etc.) |
 | GET | `/v1/models/:provider/:model` | Full capability doc for one model; slash-bearing OpenRouter ids supported |
 | POST | `/v1/chat` | Unified completion; set `stream: true` for SSE |
-| POST | `/v1/validate` | Dry-run validation — returns violations and effectiveParams without a network call |
+| POST | `/v1/validate` | Dry-run validation — returns violations and effectiveParams without a network call (optional `messages` are checked for modalities / cache support) |
 
 ### SSE framing
 
@@ -124,15 +218,15 @@ Streaming responses (`POST /v1/chat` with `stream: true`) use Server-Sent Events
 - Each frame: `data: <StreamEvent JSON>\n\n`
 - Error events carry serialized `GatewayError` objects (kind, message, provider, retryable)
 - Stream ends with `data: [DONE]\n\n`
-- `timeoutMs` bounds time-to-first-headers only; the body is deliberately unbounded so long streams are not cut off
+- `timeoutMs` bounds time-to-first-headers only; long streams are not cut off, but a stream that stalls (no bytes for `streamIdleTimeoutMs`, default 60s / 180s when reasoning) ends with a `timeout` error event
 
 ### Error status codes
 
 | Status | Cause |
 |--------|-------|
-| 400 | `invalid_request` or `unsupported_parameter` |
+| 400 | `invalid_request`, `unsupported_parameter` or `context_overflow` |
 | 401 | `auth` — missing or rejected credential |
-| 402 | `quota` — provider quota exceeded |
+| 402 | `quota` / `billing` — provider quota or credit exhausted |
 | 422 | `content_filter` |
 | 429 | `rate_limit` |
 | 499 | client abort (both `chat()` and mid-stream `stream()`) |

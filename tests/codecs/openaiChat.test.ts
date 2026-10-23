@@ -102,6 +102,15 @@ describe("openai-chat encode — OpenRouter dialect", () => {
     expect(encoded.url).toBe("https://openrouter.ai/api/v1/chat/completions");
   });
 
+  it("reasoning.exclude stays gateway-side on OpenRouter so reasoning_details still come back for round-trip", () => {
+    const encoded = goldenEncode("openrouter", "anthropic/claude-sonnet-4.5", {
+      params: { "reasoning.enabled": true, "reasoning.exclude": true }
+    });
+    expect(encoded.body.reasoning).toEqual({ enabled: true });
+    expect(JSON.stringify(encoded.body)).not.toContain("exclude");
+    expect(encoded.warnings.filter((w) => w.code === "unmapped_param")).toEqual([]);
+  });
+
   it("GOLDEN: an Anthropic model via OpenRouter maps budgetTokens to reasoning.max_tokens", () => {
     const encoded = goldenEncode("openrouter", "anthropic/claude-fable-5", {
       params: { "reasoning.enabled": true, "reasoning.budgetTokens": 2000 }
@@ -255,9 +264,41 @@ describe("openai-chat decodeResponse", () => {
         { type: "toolCall", id: "call_9", name: "pick", arguments: '{"k":1}' }
       ],
       finishReason: "tool_calls",
-      usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 3, cachedInputTokens: 4 },
+      usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 3, cacheReadTokens: 4, cachedInputTokens: 4 },
       warnings: []
     });
+  });
+
+  it("normalizes OpenRouter usage incl. cache writes, reasoning subset and reported cost (G10)", () => {
+    const orModel = registry.resolve("openrouter", "anthropic/claude-sonnet-4.5")!;
+    const response = openaiChatCodec.decodeResponse(orModel, {
+      choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 20,
+        prompt_tokens_details: { cached_tokens: 80, cache_write_tokens: 10 },
+        completion_tokens_details: { reasoning_tokens: 5 },
+        cost: 0.0012
+      }
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      reasoningTokens: 5,
+      cacheReadTokens: 80,
+      cacheWriteTokens: 10,
+      cachedInputTokens: 80,
+      costUsd: 0.0012
+    });
+  });
+
+  it("reads Moonshot's top-level cached_tokens", () => {
+    const kimi = registry.resolve("moonshot", "kimi-k2.6")!;
+    const response = openaiChatCodec.decodeResponse(kimi, {
+      choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 50, completion_tokens: 2, cached_tokens: 40 }
+    });
+    expect(response.usage).toMatchObject({ inputTokens: 50, cacheReadTokens: 40 });
   });
 
   it("maps finish reasons, defaulting unknown ones to error", () => {
@@ -272,6 +313,98 @@ describe("openai-chat decodeResponse", () => {
 
   it("throws GatewayError server when choices are missing", () => {
     expect(() => openaiChatCodec.decodeResponse(model, { object: "error" })).toThrow(GatewayError);
+  });
+});
+
+describe("openai-chat — OpenRouter reasoning / reasoning_details (G2)", () => {
+  const orModel = registry.resolve("openrouter", "anthropic/claude-sonnet-4.5")!;
+  const DETAILS = [{ type: "reasoning.text", text: "thought", signature: "sig_or", format: "anthropic-claude-v1", index: 0 }];
+
+  it("decodes message.reasoning + reasoning_details (non-stream)", () => {
+    const response = openaiChatCodec.decodeResponse(orModel, {
+      id: "gen_1",
+      choices: [
+        {
+          message: {
+            content: null,
+            reasoning: "thought",
+            reasoning_details: DETAILS,
+            tool_calls: [{ id: "call_1", function: { name: "pick", arguments: "{}" } }]
+          },
+          finish_reason: "tool_calls"
+        }
+      ],
+      usage: { prompt_tokens: 5, completion_tokens: 3 }
+    });
+    expect(response.content).toEqual([
+      { type: "reasoning", text: "thought", details: DETAILS },
+      { type: "toolCall", id: "call_1", name: "pick", arguments: "{}" }
+    ]);
+  });
+
+  it("keeps encrypted-only reasoning_details (no readable text)", () => {
+    const encrypted = [{ type: "reasoning.encrypted", data: "opaque==", format: "openai-responses-v1", index: 0 }];
+    const response = openaiChatCodec.decodeResponse(orModel, {
+      choices: [{ message: { content: "hi", reasoning_details: encrypted }, finish_reason: "stop" }]
+    });
+    expect(response.content).toEqual([
+      { type: "reasoning", text: "", details: encrypted },
+      { type: "text", text: "hi" }
+    ]);
+  });
+
+  it("streams delta.reasoning as reasoning-delta and merges reasoning_details chunks by index", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        orModel,
+        sse([
+          { data: JSON.stringify({ id: "gen_2", choices: [{ delta: { reasoning: "th", reasoning_details: [{ type: "reasoning.text", text: "th", format: "anthropic-claude-v1", index: 0 }] } }] }) },
+          { data: JSON.stringify({ choices: [{ delta: { reasoning: "ought", reasoning_details: [{ type: "reasoning.text", text: "ought", index: 0 }] } }] }) },
+          { data: JSON.stringify({ choices: [{ delta: { reasoning_details: [{ type: "reasoning.text", signature: "sig_or", index: 0 }] } }] }) },
+          { data: JSON.stringify({ choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] }) },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    expect(events.filter((e) => e.type === "reasoning-delta")).toEqual([
+      { type: "reasoning-delta", text: "th" },
+      { type: "reasoning-delta", text: "ought" }
+    ]);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "reasoning", text: "thought", details: DETAILS },
+      { type: "text", text: "ok" }
+    ]);
+  });
+
+  it("round-trips reasoning_details on assistant tool-call turns for OpenRouter routes", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "q" },
+      {
+        role: "assistant",
+        content: [
+          { type: "reasoning", text: "thought", details: DETAILS },
+          { type: "toolCall", id: "call_1", name: "pick", arguments: "{}" }
+        ]
+      },
+      { role: "tool", toolCallId: "call_1", content: "42" }
+    ];
+    const encoded = goldenEncode("openrouter", "anthropic/claude-sonnet-4.5", { messages });
+    expect((encoded.body.messages as Array<Record<string, unknown>>)[1]).toEqual({
+      role: "assistant",
+      content: null,
+      tool_calls: [{ id: "call_1", type: "function", function: { name: "pick", arguments: "{}" } }],
+      reasoning_details: DETAILS
+    });
+  });
+
+  it("does not send reasoning_details to native (non-OpenRouter) routes", () => {
+    const messages: ChatMessage[] = [
+      { role: "assistant", content: [{ type: "reasoning", text: "thought", details: DETAILS }, { type: "toolCall", id: "c", name: "pick", arguments: "{}" }] }
+    ];
+    const encoded = goldenEncode("deepseek", "deepseek-v4-flash", { params: { "reasoning.enabled": false }, messages });
+    expect((encoded.body.messages as Array<Record<string, unknown>>)[0]).not.toHaveProperty("reasoning_details");
   });
 });
 
@@ -335,6 +468,66 @@ describe("openai-chat decodeStream", () => {
       expect(done.response.content).toEqual([{ type: "toolCall", id: "call_1", name: "pick", arguments: '{"k":1}' }]);
       expect(done.response.finishReason).toBe("tool_calls");
     }
+  });
+
+  it("keys index-less tool-call deltas by id instead of merging them into call 0 (G11)", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"id":"call_a","function":{"name":"first","arguments":"{}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"id":"call_b","function":{"name":"second","arguments":"{\\"k\\""}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"function":{"arguments":":1}"}}]},"finish_reason":"tool_calls"}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const deltas = events.filter((e) => e.type === "tool-call-delta");
+    expect(deltas.map((d) => d.type === "tool-call-delta" && d.index)).toEqual([0, 1, 1]);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "toolCall", id: "call_a", name: "first", arguments: "{}" },
+      { type: "toolCall", id: "call_b", name: "second", arguments: '{"k":1}' }
+    ]);
+  });
+
+  it("splits parallel calls that reuse index 0 with distinct ids (Gemini OpenAI-compat)", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"first","arguments":"{\\"x\\":1}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_b","function":{"name":"second","arguments":"{\\"y\\":2}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":""}}]},"finish_reason":"tool_calls"}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const deltas = events.filter((e) => e.type === "tool-call-delta");
+    expect(deltas.map((d) => d.type === "tool-call-delta" && d.index)).toEqual([0, 1, 1]);
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content).toEqual([
+      { type: "toolCall", id: "call_a", name: "first", arguments: '{"x":1}' },
+      { type: "toolCall", id: "call_b", name: "second", arguments: '{"y":2}' }
+    ]);
+  });
+
+  it("maps sparse/out-of-order provider indexes onto dense positions", async () => {
+    const events = await collect(
+      openaiChatCodec.decodeStream(
+        model,
+        sse([
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":3,"id":"call_x","function":{"name":"x","arguments":"{}"}}]}}]}' },
+          { data: '{"choices":[{"delta":{"tool_calls":[{"index":5,"id":"call_y","function":{"name":"y","arguments":"{}"}}]}}]}' },
+          { data: "[DONE]" }
+        ])
+      )
+    );
+    const done = events.at(-1)!;
+    if (done.type !== "done") throw new Error("no done");
+    expect(done.response.content.map((b) => b.type === "toolCall" && b.id)).toEqual(["call_x", "call_y"]);
   });
 
   it("throws GatewayError on malformed chunks", async () => {

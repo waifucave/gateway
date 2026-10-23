@@ -45,10 +45,16 @@ export type ConstraintRule = {
   source?: string;
 };
 
+/** USD per million tokens. Cache tiers without a price fall back to inputPerMTok when costing usage. */
 export type Pricing = {
   inputPerMTok?: number | null;
   outputPerMTok?: number | null;
+  /** Cache READ price. */
   cachedInputPerMTok?: number | null;
+  /** Cache WRITE price (Anthropic 5-minute TTL: 1.25× input). */
+  cacheWritePerMTok?: number | null;
+  /** Cache write price for the 1-hour TTL (Anthropic: 2× input). */
+  cacheWrite1hPerMTok?: number | null;
 };
 
 export type RouteOverrides = {

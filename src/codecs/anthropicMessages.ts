@@ -1,9 +1,20 @@
 import { GatewayError, extractErrorMessage } from "../errors.js";
 import type { ResolvedModel } from "../registry/types.js";
-import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, Usage } from "../client/types.js";
+import type { CacheControl, ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, TextBlock, Usage, Warning } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined } from "./shared.js";
+import { normalizeUsage } from "../client/usage.js";
+import {
+  applyPassthrough,
+  authHeaders,
+  buildUrl,
+  enforceCacheBreakpoints,
+  mapNativeParams,
+  parseArguments,
+  pruneUndefined,
+  setPath,
+  wireCacheControl
+} from "./shared.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_THINKING_BUDGET = 1024;
@@ -12,6 +23,7 @@ const STOP_REASONS: Record<string, FinishReason> = {
   end_turn: "stop",
   stop_sequence: "stop",
   max_tokens: "length",
+  model_context_window_exceeded: "length",
   tool_use: "tool_calls",
   refusal: "content_filter"
 };
@@ -29,8 +41,29 @@ type AnthropicPayload = {
     name?: string;
     input?: unknown;
   }>;
-  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number };
+  usage?: WireUsage;
 };
+
+type WireUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number };
+};
+
+/** Anthropic's input_tokens is the UNCACHED remainder only — the normalized total adds reads and writes back. */
+function decodeUsage(usage: WireUsage | undefined): Usage {
+  const cacheRead = usage?.cache_read_input_tokens;
+  const cacheWrite = usage?.cache_creation_input_tokens;
+  return normalizeUsage({
+    inputTokens: (usage?.input_tokens ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0),
+    outputTokens: usage?.output_tokens ?? 0,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+    cacheWrite1hTokens: usage?.cache_creation?.ephemeral_1h_input_tokens
+  });
+}
 
 function defaultMaxTokens(model: ResolvedModel): number {
   return model.limits.maxOutputTokens > 0 ? Math.min(model.limits.maxOutputTokens, DEFAULT_MAX_TOKENS) : DEFAULT_MAX_TOKENS;
@@ -38,59 +71,139 @@ function defaultMaxTokens(model: ResolvedModel): number {
 
 type WireMessage = { role: "user" | "assistant"; content: Array<Record<string, unknown>> };
 
-function encodeMessages(model: ResolvedModel, messages: ChatMessage[]): { system?: string; messages: WireMessage[] } {
-  const systems: string[] = [];
+type WireBlock = Record<string, unknown>;
+
+/** Text block → wire block, carrying a block-level cache breakpoint. */
+function textBlock(block: TextBlock): WireBlock {
+  return block.cacheControl ? { type: "text", text: block.text, cache_control: wireCacheControl(block.cacheControl) } : { type: "text", text: block.text };
+}
+
+/**
+ * Message-level breakpoint → the LAST block of that message that may carry
+ * one. Thinking / redacted_thinking blocks cannot be cache-marked, so the mark
+ * walks back past them; a message with nothing markable is reported.
+ */
+function markLastBlock(blocks: WireBlock[], cacheControl: CacheControl | undefined, warnings: Warning[]): void {
+  if (!cacheControl) return;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const type = blocks[i]!.type;
+    if (type === "thinking" || type === "redacted_thinking") continue;
+    blocks[i] = { ...blocks[i]!, cache_control: wireCacheControl(cacheControl) };
+    return;
+  }
+  warnings.push({ code: "cache_ignored", param: "cacheControl", message: "cache breakpoint on a message with no cacheable block was ignored" });
+}
+
+function encodeMessages(
+  model: ResolvedModel,
+  messages: ChatMessage[],
+  warnings: Warning[]
+): { system?: string | WireBlock[]; messages: WireMessage[] } {
+  const systemBlocks: WireBlock[] = [];
+  let systemMarked = false;
   const out: WireMessage[] = [];
   // Anthropic rejects empty content arrays and empty text blocks (400) —
   // strip empty text blocks and drop turns that end up with no blocks at all.
-  const push = (role: "user" | "assistant", rawBlocks: Array<Record<string, unknown>>) => {
+  const push = (role: "user" | "assistant", rawBlocks: WireBlock[], cacheControl: CacheControl | undefined) => {
     const blocks = rawBlocks.filter((block) => !(block.type === "text" && block.text === ""));
     if (blocks.length === 0) return;
+    markLastBlock(blocks, cacheControl, warnings);
     const last = out[out.length - 1];
     if (last && last.role === role) last.content.push(...blocks);
     else out.push({ role, content: blocks });
   };
-  for (const message of messages) {
+  for (const [messageIndex, message] of messages.entries()) {
     if (message.role === "system") {
-      systems.push(message.content);
+      const blocks = (typeof message.content === "string" ? [{ type: "text" as const, text: message.content }] : message.content)
+        .filter((block) => block.text !== "")
+        .map(textBlock);
+      markLastBlock(blocks, message.cacheControl, warnings);
+      if (blocks.some((block) => block.cache_control !== undefined) || Array.isArray(message.content)) systemMarked = true;
+      systemBlocks.push(...blocks);
     } else if (message.role === "tool") {
-      push("user", [{ type: "tool_result", tool_use_id: message.toolCallId, content: message.content }]);
+      push("user", [{ type: "tool_result", tool_use_id: message.toolCallId, content: message.content }], message.cacheControl);
     } else if (message.role === "user") {
       const blocks =
         typeof message.content === "string"
           ? [{ type: "text", text: message.content }]
           : message.content.map((block) =>
-              block.type === "text"
-                ? { type: "text", text: block.text }
-                : { type: "image", source: { type: "base64", media_type: block.mimeType, data: block.data } }
+              block.type === "text" ? textBlock(block) : { type: "image", source: { type: "base64", media_type: block.mimeType, data: block.data } }
             );
-      push("user", blocks);
+      push("user", blocks, message.cacheControl);
     } else {
       const blocks =
         typeof message.content === "string"
           ? [{ type: "text", text: message.content }]
-          : message.content.map((block): Record<string, unknown> => {
-              if (block.type === "text") return { type: "text", text: block.text };
+          : message.content.flatMap((block, blockIndex): WireBlock[] => {
+              if (block.type === "text") return [textBlock(block)];
               if (block.type === "toolCall") {
-                return { type: "tool_use", id: block.id, name: block.name, input: parseArguments(model.providerId, block.name, block.arguments) };
+                return [{ type: "tool_use", id: block.id, name: block.name, input: parseArguments(model.providerId, block.name, block.arguments) }];
               }
-              return block.redacted
-                ? { type: "redacted_thinking", data: block.data ?? "" }
-                : pruneUndefined({ type: "thinking", thinking: block.text, signature: block.signature });
+              if (block.redacted) return [{ type: "redacted_thinking", data: block.data ?? "" }];
+              // Anthropic 400s a thinking block without a signature (e.g. reasoning
+              // produced by another provider after a model switch) — drop it.
+              if (block.signature === undefined || block.signature === "") {
+                warnings.push({
+                  code: "content_dropped",
+                  param: `messages[${messageIndex}].content[${blockIndex}]`,
+                  message: `reasoning block without a signature cannot be replayed to ${model.providerId}; dropped`
+                });
+                return [];
+              }
+              return [{ type: "thinking", thinking: block.replay ?? block.text, signature: block.signature }];
             });
-      push("assistant", blocks);
+      push("assistant", blocks, message.cacheControl);
     }
   }
-  return { system: systems.length > 0 ? systems.join("\n\n") : undefined, messages: out };
+  // Breakpoints need the block form; unmarked plain-string systems keep the
+  // historical joined string (byte-identical prompts for existing callers).
+  const system =
+    systemBlocks.length === 0 ? undefined : systemMarked ? systemBlocks : systemBlocks.map((block) => block.text as string).join("\n\n");
+  enforceCacheBreakpoints([...(Array.isArray(system) ? system : []), ...out.flatMap((message) => message.content)], model.providerId, warnings);
+  return { system, messages: out };
+}
+
+/**
+ * Anthropic structured outputs accept a JSON-Schema subset: every object must
+ * be closed (`additionalProperties: false`) and numeric/length/array-size
+ * constraints are rejected. Close objects and move those constraints into the
+ * description (the official SDKs do the same), so callers keep one schema for
+ * every wire. Returns a deep copy — the caller's schema is never mutated.
+ */
+const UNSUPPORTED_SCHEMA_CONSTRAINTS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems"];
+
+function toAnthropicOutputSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map((entry) => toAnthropicOutputSchema(entry));
+  if (schema === null || typeof schema !== "object") return schema;
+  const source = schema as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  const notes: string[] = [];
+  for (const [key, value] of Object.entries(source)) {
+    if (UNSUPPORTED_SCHEMA_CONSTRAINTS.includes(key) || (key === "minItems" && typeof value === "number" && value > 1)) {
+      notes.push(`${key}: ${JSON.stringify(value)}`);
+    } else if ((key === "properties" || key === "$defs" || key === "definitions") && value && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([name, sub]) => [name, toAnthropicOutputSchema(sub)]));
+    } else if (key === "additionalProperties") {
+      continue; // re-set to false below for objects
+    } else if (key === "items" || key === "anyOf" || key === "allOf" || key === "oneOf" || key === "prefixItems") {
+      out[key] = toAnthropicOutputSchema(value);
+    } else {
+      out[key] = structuredClone(value);
+    }
+  }
+  if (notes.length > 0) {
+    const note = `(${notes.join(", ")})`;
+    out.description = typeof out.description === "string" && out.description !== "" ? `${out.description} ${note}` : note;
+  }
+  const isObject = out.type === "object" || (Array.isArray(out.type) && out.type.includes("object")) || "properties" in out;
+  // Anthropic accepts only `additionalProperties: false` — force it on every object
+  if (isObject) out.additionalProperties = false;
+  return out;
 }
 
 function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): EncodedRequest {
-  if (request.responseFormat) {
-    throw new GatewayError(
-      "invalid_request",
-      "responseFormat is not implemented for the anthropic-messages codec; use tools for structured output",
-      { provider: model.providerId }
-    );
+  if (request.responseFormat?.type === "json_object") {
+    throw new GatewayError("invalid_request", "anthropic-messages has no JSON mode; use responseFormat json_schema", { provider: model.providerId });
   }
   const mapped = mapNativeParams(model, request.effectiveParams);
   const warnings = [...mapped.warnings];
@@ -121,7 +234,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
       body.thinking = { type: "disabled" };
     }
   }
-  const { system, messages } = encodeMessages(model, request.messages);
+  const { system, messages } = encodeMessages(model, request.messages, warnings);
   if (system !== undefined) body.system = system;
   body.messages = messages;
   if (request.tools?.length) {
@@ -135,8 +248,13 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
           ? { type: "any" }
           : { type: request.toolChoice };
   }
+  if (request.responseFormat?.type === "json_schema") {
+    // Native structured outputs (GA, no beta header): output_config.format, merged
+    // with output_config.effort when both are set. The JSON arrives as the text block.
+    setPath(body, "output_config.format", { type: "json_schema", schema: toAnthropicOutputSchema(request.responseFormat.schema) });
+  }
   if (request.stream) body.stream = true;
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 
@@ -158,11 +276,7 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
       content.push({ type: "toolCall", id: block.id ?? `call_${index}`, name: block.name ?? "", arguments: JSON.stringify(block.input ?? {}) });
     }
   });
-  const usage: Usage = pruneUndefined({
-    inputTokens: wire.usage?.input_tokens ?? 0,
-    outputTokens: wire.usage?.output_tokens ?? 0,
-    cachedInputTokens: wire.usage?.cache_read_input_tokens
-  });
+  const usage = decodeUsage(wire.usage);
   return {
     id: wire.id ?? "",
     provider: model.providerId,
@@ -195,9 +309,9 @@ function assembleContent(blocks: Map<number, StreamBlock>): ContentBlock[] {
 async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEvent>): AsyncGenerator<StreamEvent> {
   let id = "";
   let finishReason: FinishReason = "error";
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cachedInputTokens: number | undefined;
+  // message_start carries the prompt counts; message_delta's usage is cumulative
+  // (and on newer API versions repeats the input/cache fields) — merge, later wins.
+  let wireUsage: WireUsage = {};
   const blocks = new Map<number, StreamBlock>();
   let nextToolIndex = 0;
 
@@ -212,8 +326,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     const type = event.event ?? (data.type as string | undefined);
     if (type === "message_start") {
       id = (data.message as Record<string, unknown> | undefined)?.id as string ?? "";
-      inputTokens = ((data.message as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined)?.input_tokens as number ?? 0;
-      cachedInputTokens = ((data.message as Record<string, unknown> | undefined)?.usage as Record<string, unknown> | undefined)?.cache_read_input_tokens as number | undefined;
+      wireUsage = { ...wireUsage, ...(((data.message as Record<string, unknown> | undefined)?.usage ?? {}) as WireUsage) };
     } else if (type === "content_block_start") {
       const index = data.index as number;
       const block = (data.content_block ?? {}) as Record<string, unknown>;
@@ -255,9 +368,11 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       const delta = (data.delta ?? {}) as Record<string, unknown>;
       if (typeof delta.stop_reason === "string") finishReason = STOP_REASONS[delta.stop_reason] ?? "error";
       const usageData = (data.usage ?? {}) as Record<string, unknown>;
-      if (typeof usageData.output_tokens === "number") outputTokens = usageData.output_tokens;
+      for (const [key, value] of Object.entries(usageData)) {
+        if (value !== null && value !== undefined) (wireUsage as Record<string, unknown>)[key] = value;
+      }
     } else if (type === "message_stop") {
-      const usage: Usage = pruneUndefined({ inputTokens, outputTokens, cachedInputTokens });
+      const usage = decodeUsage(wireUsage);
       yield { type: "usage", usage };
       yield {
         type: "done",
@@ -281,7 +396,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
       model: model.modelId,
       content: assembleContent(blocks),
       finishReason,
-      usage: pruneUndefined({ inputTokens, outputTokens, cachedInputTokens }),
+      usage: decodeUsage(wireUsage),
       warnings: []
     }
   };

@@ -71,6 +71,7 @@ describe("GET /v1/models", () => {
       jsonMode: true,
       jsonSchema: false,
       imageInput: false,
+      promptCaching: "implicit",
       deprecated: false,
       confidence: "verified"
     });
@@ -187,6 +188,20 @@ describe("POST /v1/validate", () => {
       ],
       effectiveParams: { "reasoning.enabled": true, "reasoning.effort": "high" }
     });
+  });
+
+  it("checks optional messages against input modalities (G9)", async () => {
+    const handler = createGatewayHandler();
+    const response = await post(handler, "/v1/validate", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: [{ type: "image", mimeType: "image/png", data: "AA" }] }]
+    });
+    const body = (await response.json()) as { ok: boolean; violations: Array<{ code: string }> };
+    expect(body.ok).toBe(false);
+    expect(body.violations.map((v) => v.code)).toContain("unsupported_modality");
+    const malformed = await post(handler, "/v1/validate", { provider: "deepseek", model: "deepseek-v4-pro", messages: "nope" });
+    expect(malformed.status).toBe(400);
   });
 
   it("reports forbidden tool choice under thinking (UI live-gating contract)", async () => {
@@ -353,6 +368,22 @@ describe("POST /v1/chat (non-streaming)", () => {
     expect(providerError.status).toBe(401);
     const providerBody = (await providerError.json()) as { error: { kind: string; status: number } };
     expect(providerBody.error).toMatchObject({ kind: "auth", status: 401, provider: "deepseek" });
+  });
+
+  it("400s passthrough that tries to overwrite a core body key (G3) without calling the provider", async () => {
+    const fetchImpl = jsonFetch(OK_PAYLOAD);
+    const handler = createGatewayHandler({ credentials: { deepseek: "sk-test" }, fetchImpl });
+    const response = await post(handler, "/v1/chat", {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      messages: [{ role: "user", content: "hi" }],
+      passthrough: { model: "some-other-model" }
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { kind: string; message: string } };
+    expect(body.error.kind).toBe("invalid_request");
+    expect(body.error.message).toMatch(/passthrough key "model" is reserved/);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("404s unknown models and 400s missing messages", async () => {

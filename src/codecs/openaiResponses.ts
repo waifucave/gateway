@@ -3,7 +3,8 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, TextBlock, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, pruneUndefined, setPath } from "./shared.js";
+import { normalizeUsage } from "../client/usage.js";
+import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, pruneUndefined, setPath, supportsPromptCacheKey } from "./shared.js";
 
 type ResponsesPayload = {
   id?: string;
@@ -29,7 +30,8 @@ function encodeInput(messages: ChatMessage[]): Array<Record<string, unknown>> {
   const input: Array<Record<string, unknown>> = [];
   for (const message of messages) {
     if (message.role === "system") {
-      input.push({ role: "developer", content: [{ type: "input_text", text: message.content }] });
+      const blocks = typeof message.content === "string" ? [{ text: message.content }] : message.content.filter((block) => block.text !== "");
+      input.push({ role: "developer", content: blocks.map((block) => ({ type: "input_text", text: block.text })) });
     } else if (message.role === "tool") {
       input.push({ type: "function_call_output", call_id: message.toolCallId, output: message.content });
     } else if (message.role === "user") {
@@ -65,6 +67,8 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
   const warnings = [...mapped.warnings];
   const body: Record<string, unknown> = { model: model.modelId, ...mapped.wire };
   body.input = encodeInput(request.messages);
+  // OpenAI caches prefixes implicitly; cache markers are a no-op, the key routes requests to a shared cache.
+  if (request.promptCacheKey !== undefined && supportsPromptCacheKey(model)) body.prompt_cache_key = request.promptCacheKey;
   if (request.tools?.length) {
     body.tools = request.tools.map((tool) =>
       pruneUndefined({ type: "function", name: tool.name, description: tool.description, parameters: tool.parameters, strict: tool.strict })
@@ -88,7 +92,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     );
   }
   if (request.stream) body.stream = true;
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 
@@ -127,11 +131,12 @@ function decodeResponse(model: ResolvedModel, payload: unknown): ChatResponse {
             ? "content_filter"
             : "error"
         : "error";
-  const usage: Usage = pruneUndefined({
+  // Responses already reports totals: input includes cached, output includes reasoning.
+  const usage: Usage = normalizeUsage({
     inputTokens: wire.usage?.input_tokens ?? 0,
     outputTokens: wire.usage?.output_tokens ?? 0,
     reasoningTokens: wire.usage?.output_tokens_details?.reasoning_tokens,
-    cachedInputTokens: wire.usage?.input_tokens_details?.cached_tokens
+    cacheReadTokens: wire.usage?.input_tokens_details?.cached_tokens
   });
   return { id: wire.id ?? "", provider: model.providerId, model: model.modelId, content, finishReason, usage, warnings: [] };
 }
@@ -186,7 +191,9 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
         if (entry) entry.arguments += data.delta;
         yield { type: "tool-call-delta", index, argumentsDelta: data.delta };
       }
-    } else if (type === "response.completed") {
+    } else if (type === "response.completed" || type === "response.incomplete") {
+      // response.incomplete is terminal too (max_output_tokens / content_filter):
+      // decodeResponse maps its status + incomplete_details to length / content_filter.
       const response = decodeResponse(model, data.response);
       yield { type: "usage", usage: response.usage };
       yield { type: "done", response };

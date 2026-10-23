@@ -3,7 +3,8 @@ import type { ResolvedModel } from "../registry/types.js";
 import type { ChatMessage, ChatResponse, ContentBlock, FinishReason, StreamEvent, ToolCallBlock, Usage } from "../client/types.js";
 import type { SseEvent } from "../transport/sse.js";
 import type { Codec, CodecRequest, EncodedRequest } from "./types.js";
-import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath } from "./shared.js";
+import { normalizeUsage } from "../client/usage.js";
+import { applyPassthrough, authHeaders, buildUrl, mapNativeParams, parseArguments, pruneUndefined, setPath, systemText } from "./shared.js";
 
 const FINISH_REASONS: Record<string, FinishReason> = {
   STOP: "stop",
@@ -51,7 +52,8 @@ function encodeContents(
   };
   for (const message of messages) {
     if (message.role === "system") {
-      systems.push(message.content);
+      // Gemini caches implicitly; cacheControl markers are a no-op on this wire.
+      systems.push(systemText(message.content));
     } else if (message.role === "tool") {
       const name = toolNameById.get(message.toolCallId);
       if (name === undefined) {
@@ -93,7 +95,7 @@ function encodeContents(
         // Reasoning is re-encoded unconditionally (not gated on features.reasoningRoundTrip,
         // unlike openai-chat): Gemini 3 requires thoughtSignature round-trip on tool loops,
         // mirroring the anthropic-messages pattern.
-        return pruneUndefined({ text: block.text, thought: true, thoughtSignature: block.signature });
+        return pruneUndefined({ text: block.replay ?? block.text, thought: true, thoughtSignature: block.signature });
       });
       push("model", parts);
     }
@@ -144,7 +146,7 @@ function encode(model: ResolvedModel, request: CodecRequest, apiKey: string): En
     if (request.responseFormat.type === "json_schema") setPath(body, "generationConfig.responseJsonSchema", request.responseFormat.schema);
   }
   // streaming is selected via the URL (:streamGenerateContent?alt=sse); no body flag
-  applyPassthrough(body, request.passthrough, warnings);
+  applyPassthrough(body, request.passthrough, warnings, { wire: model.wire, provider: model.providerId });
   return { url: buildUrl(model, request.stream), headers: authHeaders(model, apiKey), body: pruneUndefined(body), warnings };
 }
 
@@ -176,12 +178,13 @@ function decodeParts(parts: GooglePart[], toolStartIndex: number): { blocks: Con
   return { blocks, toolCount };
 }
 
+/** promptTokenCount already includes cached content; candidatesTokenCount EXCLUDES thoughts, so output adds them back. */
 function decodeUsage(meta: GooglePayload["usageMetadata"]): Usage {
-  return pruneUndefined({
+  return normalizeUsage({
     inputTokens: meta?.promptTokenCount ?? 0,
-    outputTokens: meta?.candidatesTokenCount ?? 0,
+    outputTokens: (meta?.candidatesTokenCount ?? 0) + (meta?.thoughtsTokenCount ?? 0),
     reasoningTokens: meta?.thoughtsTokenCount,
-    cachedInputTokens: meta?.cachedContentTokenCount
+    cacheReadTokens: meta?.cachedContentTokenCount
   });
 }
 
@@ -217,7 +220,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
   let text = "";
   let reasoning = "";
   let reasoningSignature: string | undefined;
-  const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+  const toolCalls: Array<{ id: string; name: string; arguments: string; signature?: string }> = [];
 
   for await (const event of events) {
     let chunk: GooglePayload;
@@ -231,11 +234,14 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     for (const part of candidate?.content?.parts ?? []) {
       if (part.functionCall) {
         const index = toolCalls.length;
-        const call = {
+        // Gemini 3 puts the thoughtSignature on the functionCall part itself; it must
+        // round-trip on replay exactly like the non-streaming path (decodeParts).
+        const call = pruneUndefined({
           id: part.functionCall.id ?? `call_${index}`,
           name: part.functionCall.name ?? "",
-          arguments: JSON.stringify(part.functionCall.args ?? {})
-        };
+          arguments: JSON.stringify(part.functionCall.args ?? {}),
+          signature: part.thoughtSignature
+        });
         toolCalls.push(call);
         // functionCall parts arrive whole, so the delta carries the complete arguments JSON
         yield { type: "tool-call-delta", index, id: call.id, name: call.name, argumentsDelta: call.arguments };
@@ -267,7 +273,7 @@ async function* decodeStream(model: ResolvedModel, events: AsyncIterable<SseEven
     );
   }
   if (text !== "") content.push({ type: "text", text });
-  for (const call of toolCalls) content.push({ type: "toolCall", id: call.id, name: call.name, arguments: call.arguments });
+  for (const call of toolCalls) content.push(pruneUndefined({ type: "toolCall", id: call.id, name: call.name, arguments: call.arguments, signature: call.signature }));
   yield {
     type: "done",
     response: { id, provider: model.providerId, model: model.modelId, content, finishReason, usage, warnings: [] }

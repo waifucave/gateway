@@ -18,6 +18,55 @@ async function* toByteIterable(body: ReadableStream<Uint8Array> | AsyncIterable<
 }
 
 /**
+ * Stall guard for streaming bodies: rejects with `onStall()`'s error when no
+ * chunk arrives within `idleMs` of the previous one (or of the start). The
+ * underlying reader is cancelled so the connection is released. `idleMs <= 0`
+ * disables the guard. Any byte counts as activity (SSE comments/pings too).
+ */
+export async function* withIdleTimeout(
+  body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
+  idleMs: number,
+  onStall: () => Error
+): AsyncGenerator<Uint8Array> {
+  if (!(idleMs > 0)) {
+    yield* toByteIterable(body);
+    return;
+  }
+  // Prefer a reader for web streams: reader.cancel() settles a read() that is
+  // blocked forever, which an async iterator's return() cannot do.
+  const reader = typeof (body as ReadableStream<Uint8Array>).getReader === "function" ? (body as ReadableStream<Uint8Array>).getReader() : undefined;
+  const iterator = reader ? undefined : (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+  const read = (): Promise<IteratorResult<Uint8Array>> =>
+    reader ? (reader.read() as Promise<IteratorResult<Uint8Array>>) : iterator!.next();
+  let settled = false;
+  try {
+    while (true) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stalled = new Promise<"stalled">((resolve) => {
+        timer = setTimeout(() => resolve("stalled"), idleMs);
+      });
+      const pending = read();
+      const result = await Promise.race([pending, stalled]).finally(() => clearTimeout(timer));
+      if (result === "stalled") {
+        pending.catch(() => {}); // settles (or rejects) once cancelled — never an unhandled rejection
+        throw onStall();
+      }
+      if (result.done) {
+        settled = true;
+        return;
+      }
+      if (result.value !== undefined) yield result.value;
+    }
+  } finally {
+    if (!settled) {
+      if (reader) await reader.cancel().catch(() => {});
+      else void Promise.resolve(iterator?.return?.()).catch(() => {});
+    }
+    reader?.releaseLock();
+  }
+}
+
+/**
  * Incremental text/event-stream parser. Handles multi-line `data:` fields,
  * `event:` names, comments, and CR / LF / CRLF line endings split across chunks.
  */

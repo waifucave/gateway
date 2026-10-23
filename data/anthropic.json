@@ -24,7 +24,9 @@
           "pricing": {
             "inputPerMTok": 1,
             "outputPerMTok": 5,
-            "cachedInputPerMTok": 0.1
+            "cachedInputPerMTok": 0.1,
+            "cacheWritePerMTok": 1.25,
+            "cacheWrite1hPerMTok": 2
           },
           "modalities": [
             "text",
@@ -125,23 +127,48 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       }
     },
     "constraints": [
       {
-        "id": "thinking-signature-round-trip",
+        "id": "thinking-drops-sampling",
         "when": {
           "param": "reasoning.enabled",
           "eq": true
         },
         "then": {
-          "force": {
-            "reasoningRoundTrip": true
+          "drop": [
+            "temperature",
+            "topK"
+          ],
+          "clamp": {
+            "topP": {
+              "min": 0.95,
+              "max": 1
+            }
           }
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — thinking isn't compatible with temperature or top_k modifications; top_p may be set between 0.95 and 1 while thinking is enabled"
+      },
+      {
+        "id": "sampling-temperature-or-top-p",
+        "when": {
+          "allOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "topP"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide — Claude 4.5+ models accept temperature OR top_p, not both (400)"
       },
       {
         "id": "thinking-no-forced-tools",
@@ -162,7 +189,9 @@
       "pricing": {
         "inputPerMTok": 1,
         "outputPerMTok": 5,
-        "cachedInputPerMTok": 0.1
+        "cachedInputPerMTok": 0.1,
+        "cacheWritePerMTok": 1.25,
+        "cacheWrite1hPerMTok": 2
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -203,7 +232,9 @@
           "pricing": {
             "inputPerMTok": 3,
             "outputPerMTok": 15,
-            "cachedInputPerMTok": 0.3
+            "cachedInputPerMTok": 0.3,
+            "cacheWritePerMTok": 3.75,
+            "cacheWrite1hPerMTok": 6
           },
           "modalities": [
             "text",
@@ -304,23 +335,48 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       }
     },
     "constraints": [
       {
-        "id": "thinking-signature-round-trip",
+        "id": "thinking-drops-sampling",
         "when": {
           "param": "reasoning.enabled",
           "eq": true
         },
         "then": {
-          "force": {
-            "reasoningRoundTrip": true
+          "drop": [
+            "temperature",
+            "topK"
+          ],
+          "clamp": {
+            "topP": {
+              "min": 0.95,
+              "max": 1
+            }
           }
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — thinking isn't compatible with temperature or top_k modifications; top_p may be set between 0.95 and 1 while thinking is enabled"
+      },
+      {
+        "id": "sampling-temperature-or-top-p",
+        "when": {
+          "allOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "topP"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide — Claude 4.5+ models accept temperature OR top_p, not both (400)"
       },
       {
         "id": "thinking-no-forced-tools",
@@ -341,7 +397,9 @@
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -382,7 +440,9 @@
           "pricing": {
             "inputPerMTok": 3,
             "outputPerMTok": 15,
-            "cachedInputPerMTok": 0.3
+            "cachedInputPerMTok": 0.3,
+            "cacheWritePerMTok": 3.75,
+            "cacheWrite1hPerMTok": 6
           },
           "modalities": [
             "text",
@@ -485,23 +545,48 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       }
     },
     "constraints": [
       {
-        "id": "thinking-signature-round-trip",
+        "id": "thinking-drops-sampling",
         "when": {
           "param": "reasoning.enabled",
           "eq": true
         },
         "then": {
-          "force": {
-            "reasoningRoundTrip": true
+          "drop": [
+            "temperature",
+            "topK"
+          ],
+          "clamp": {
+            "topP": {
+              "min": 0.95,
+              "max": 1
+            }
           }
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — thinking isn't compatible with temperature or top_k modifications; top_p may be set between 0.95 and 1 while thinking is enabled"
+      },
+      {
+        "id": "sampling-temperature-or-top-p",
+        "when": {
+          "allOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "topP"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide — Claude 4.5+ models accept temperature OR top_p, not both (400)"
       },
       {
         "id": "thinking-no-forced-tools",
@@ -522,7 +607,9 @@
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -563,7 +650,9 @@
           "pricing": {
             "inputPerMTok": 2,
             "outputPerMTok": 10,
-            "cachedInputPerMTok": 0.2
+            "cachedInputPerMTok": 0.2,
+            "cacheWritePerMTok": 2.5,
+            "cacheWrite1hPerMTok": 4
           },
           "modalities": [
             "text",
@@ -644,7 +733,6 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       },
       "reasoning.effort": {
@@ -670,26 +758,13 @@
         "confidence": "verified"
       }
     },
-    "constraints": [
-      {
-        "id": "thinking-signature-round-trip",
-        "when": {
-          "param": "reasoning.enabled",
-          "eq": true
-        },
-        "then": {
-          "force": {
-            "reasoningRoundTrip": true
-          }
-        },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/thinking — replay complete thinking blocks unchanged; editing/reordering/filtering the latest block returns HTTP 400"
-      }
-    ],
     "meta": {
       "pricing": {
         "inputPerMTok": 3,
         "outputPerMTok": 15,
-        "cachedInputPerMTok": 0.3
+        "cachedInputPerMTok": 0.3,
+        "cacheWritePerMTok": 3.75,
+        "cacheWrite1hPerMTok": 6
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,
@@ -734,7 +809,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -837,23 +914,48 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       }
     },
     "constraints": [
       {
-        "id": "thinking-signature-round-trip",
+        "id": "thinking-drops-sampling",
         "when": {
           "param": "reasoning.enabled",
           "eq": true
         },
         "then": {
-          "force": {
-            "reasoningRoundTrip": true
+          "drop": [
+            "temperature",
+            "topK"
+          ],
+          "clamp": {
+            "topP": {
+              "min": 0.95,
+              "max": 1
+            }
           }
         },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
+        "source": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking — thinking isn't compatible with temperature or top_k modifications; top_p may be set between 0.95 and 1 while thinking is enabled"
+      },
+      {
+        "id": "sampling-temperature-or-top-p",
+        "when": {
+          "allOf": [
+            {
+              "param": "temperature"
+            },
+            {
+              "param": "topP"
+            }
+          ]
+        },
+        "then": {
+          "drop": [
+            "topP"
+          ]
+        },
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide — Claude 4.5+ models accept temperature OR top_p, not both (400)"
       },
       {
         "id": "thinking-no-forced-tools",
@@ -874,7 +976,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -915,7 +1019,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -987,21 +1093,6 @@
         "confidence": "verified",
         "max": 128000
       },
-      "temperature": {
-        "type": "number",
-        "wireName": "temperature",
-        "confidence": "verified"
-      },
-      "topP": {
-        "type": "number",
-        "wireName": "top_p",
-        "confidence": "verified"
-      },
-      "topK": {
-        "type": "int",
-        "wireName": "top_k",
-        "confidence": "verified"
-      },
       "reasoning.enabled": {
         "type": "boolean",
         "wireName": "thinking.type",
@@ -1014,24 +1105,10 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       }
     },
     "constraints": [
-      {
-        "id": "thinking-signature-round-trip",
-        "when": {
-          "param": "reasoning.enabled",
-          "eq": true
-        },
-        "then": {
-          "force": {
-            "reasoningRoundTrip": true
-          }
-        },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
-      },
       {
         "id": "thinking-no-forced-tools",
         "when": {
@@ -1051,7 +1128,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "",
       "deprecated": false,
@@ -1092,7 +1171,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -1127,7 +1208,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1208,7 +1291,6 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       },
       "reasoning.effort": {
@@ -1234,26 +1316,13 @@
         "confidence": "verified"
       }
     },
-    "constraints": [
-      {
-        "id": "thinking-signature-round-trip",
-        "when": {
-          "param": "reasoning.enabled",
-          "eq": true
-        },
-        "then": {
-          "force": {
-            "reasoningRoundTrip": true
-          }
-        },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/thinking — replay complete thinking blocks unchanged; editing/reordering/filtering the latest block returns HTTP 400"
-      }
-    ],
     "meta": {
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,
@@ -1298,7 +1367,9 @@
           "pricing": {
             "inputPerMTok": 5,
             "outputPerMTok": 25,
-            "cachedInputPerMTok": 0.5
+            "cachedInputPerMTok": 0.5,
+            "cacheWritePerMTok": 6.25,
+            "cacheWrite1hPerMTok": 10
           },
           "modalities": [
             "text",
@@ -1333,7 +1404,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1414,7 +1487,6 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       },
       "reasoning.effort": {
@@ -1441,19 +1513,6 @@
       }
     },
     "constraints": [
-      {
-        "id": "thinking-signature-round-trip",
-        "when": {
-          "param": "reasoning.enabled",
-          "eq": true
-        },
-        "then": {
-          "force": {
-            "reasoningRoundTrip": true
-          }
-        },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/thinking — replay complete thinking blocks unchanged; editing/reordering/filtering the latest block returns HTTP 400"
-      },
       {
         "id": "thinking-disable-effort-cap",
         "when": {
@@ -1483,7 +1542,9 @@
       "pricing": {
         "inputPerMTok": 5,
         "outputPerMTok": 25,
-        "cachedInputPerMTok": 0.5
+        "cachedInputPerMTok": 0.5,
+        "cacheWritePerMTok": 6.25,
+        "cacheWrite1hPerMTok": 10
       },
       "knowledgeCutoff": "2026-05",
       "deprecated": false,
@@ -1528,7 +1589,9 @@
           "pricing": {
             "inputPerMTok": 10,
             "outputPerMTok": 50,
-            "cachedInputPerMTok": 1
+            "cachedInputPerMTok": 1,
+            "cacheWritePerMTok": 12.5,
+            "cacheWrite1hPerMTok": 20
           },
           "modalities": [
             "text",
@@ -1608,7 +1671,6 @@
       },
       "reasoning.exclude": {
         "type": "boolean",
-        "wireName": "thinking.redacted",
         "confidence": "verified"
       },
       "reasoning.effort": {
@@ -1634,26 +1696,13 @@
         "confidence": "verified"
       }
     },
-    "constraints": [
-      {
-        "id": "thinking-signature-round-trip",
-        "when": {
-          "param": "reasoning.enabled",
-          "eq": true
-        },
-        "then": {
-          "force": {
-            "reasoningRoundTrip": true
-          }
-        },
-        "source": "https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking"
-      }
-    ],
     "meta": {
       "pricing": {
         "inputPerMTok": 10,
         "outputPerMTok": 50,
-        "cachedInputPerMTok": 1
+        "cachedInputPerMTok": 1,
+        "cacheWritePerMTok": 12.5,
+        "cacheWrite1hPerMTok": 20
       },
       "knowledgeCutoff": "2026-01",
       "deprecated": false,

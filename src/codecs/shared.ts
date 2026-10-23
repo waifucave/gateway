@@ -1,6 +1,6 @@
 import { GatewayError } from "../errors.js";
-import type { ResolvedModel } from "../registry/types.js";
-import type { Warning } from "../client/types.js";
+import type { ResolvedModel, WireProtocol } from "../registry/types.js";
+import type { CacheControl, ChatMessage, TextBlock, Warning } from "../client/types.js";
 
 const UNSAFE_PATH_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -44,6 +44,13 @@ export function pruneUndefined<T>(value: T): T {
 /** effectiveParams keys that are validation directives, not wire params. */
 const DIRECTIVE_PARAMS = new Set(["reasoningRoundTrip"]);
 
+/**
+ * Params the GATEWAY implements when a descriptor carries no wireName (e.g.
+ * Anthropic has no "hide thinking" request field, so `reasoning.exclude` is
+ * applied to the normalized response instead — see client/gateway.ts).
+ */
+export const GATEWAY_SIDE_PARAMS = new Set(["reasoning.exclude"]);
+
 /** `thinking.type` carries "enabled"/"disabled" strings on the wire; the unified param is boolean. */
 function wireValue(wireName: string, value: unknown): unknown {
   if (wireName === "thinking.type" && typeof value === "boolean") return value ? "enabled" : "disabled";
@@ -63,6 +70,7 @@ export function mapNativeParams(model: ResolvedModel, effectiveParams: Record<st
       warnings.push({ code: "unmapped_param", param: name, message: `${name} has no descriptor on ${model.providerId}:${model.modelId}; not sent` });
       continue;
     }
+    if (descriptor.wireName === undefined && GATEWAY_SIDE_PARAMS.has(name)) continue;
     const wireName = descriptor.wireName ?? name;
     setPath(wire, wireName, wireValue(wireName, value));
   }
@@ -94,15 +102,19 @@ export const OPENROUTER_WIRE_NAMES: Record<string, string> = {
   verbosity: "verbosity",
   "reasoning.enabled": "reasoning.enabled",
   "reasoning.effort": "reasoning.effort",
-  "reasoning.budgetTokens": "reasoning.max_tokens",
-  "reasoning.exclude": "reasoning.exclude"
+  "reasoning.budgetTokens": "reasoning.max_tokens"
+  // reasoning.exclude is NOT forwarded: OpenRouter would then omit reasoning /
+  // reasoning_details, breaking signature round-trip on Claude/Gemini tool
+  // loops. The gateway hides reasoning itself (GATEWAY_SIDE_PARAMS).
 };
 
 export function mapOpenRouterParams(model: ResolvedModel, effectiveParams: Record<string, unknown>): MappedParams {
   const wire: Record<string, unknown> = {};
   const warnings: Warning[] = [];
   for (const [name, value] of Object.entries(effectiveParams)) {
-    if (value === undefined || DIRECTIVE_PARAMS.has(name)) continue;
+    // gateway-side params never go upstream on OpenRouter; reasoning.enabled /
+    // effort / budget still map, so reasoning stays on when the caller enabled it
+    if (value === undefined || DIRECTIVE_PARAMS.has(name) || GATEWAY_SIDE_PARAMS.has(name)) continue;
     const wireName = OPENROUTER_WIRE_NAMES[name];
     if (wireName === undefined) {
       warnings.push({ code: "unmapped_param", param: name, message: `${name} has no OpenRouter mapping; not sent` });
@@ -149,10 +161,124 @@ export function parseArguments(provider: string, toolName: string, argumentsJson
   throw new GatewayError("invalid_request", `tool call "${toolName}" has non-object JSON arguments`, { provider });
 }
 
-/** Merge raw passthrough keys into the body, warning per key (MIGRATION_PLAN §4.5). */
-export function applyPassthrough(body: Record<string, unknown>, passthrough: Record<string, unknown> | undefined, warnings: Warning[]): void {
-  for (const [key, value] of Object.entries(passthrough ?? {})) {
-    body[key] = value;
+/**
+ * Body keys each codec owns. Passthrough may never set them: they carry the
+ * typed request (model, conversation, tools, stream framing, structured output)
+ * and overwriting them would bypass validation entirely — /v1/chat is exposed.
+ */
+export const CORE_BODY_KEYS: Record<WireProtocol, ReadonlySet<string>> = {
+  "openai-chat": new Set(["model", "messages", "tools", "tool_choice", "stream", "stream_options", "response_format"]),
+  "openai-responses": new Set(["model", "input", "instructions", "tools", "tool_choice", "stream", "previous_response_id"]),
+  "anthropic-messages": new Set(["model", "messages", "system", "tools", "tool_choice", "stream"]),
+  "google-generative-language": new Set(["contents", "systemInstruction", "tools", "toolConfig"])
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Recursive merge: objects merge key-by-key, everything else (arrays, scalars) replaces. */
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...target };
+  for (const [key, value] of Object.entries(source)) {
+    if (UNSAFE_PATH_KEYS.has(key)) throw new GatewayError("invalid_request", `passthrough key "${key}" is not allowed`);
+    const current = out[key];
+    out[key] = isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
+  }
+  return out;
+}
+
+/**
+ * Merge raw passthrough keys into the body, warning per key (MIGRATION_PLAN §4.5).
+ * With `scope`, the wire's CORE_BODY_KEYS are rejected (GatewayError
+ * invalid_request) and object values deep-merge into what the codec already
+ * wrote (e.g. passthrough `thinking: {display}` keeps the encoded `thinking.type`).
+ */
+export function applyPassthrough(
+  body: Record<string, unknown>,
+  passthrough: Record<string, unknown> | undefined,
+  warnings: Warning[],
+  scope?: { wire: WireProtocol; provider: string }
+): void {
+  const entries = Object.entries(passthrough ?? {});
+  const core = scope ? CORE_BODY_KEYS[scope.wire] : undefined;
+  // validate every key before mutating anything — a rejected request leaves the body untouched
+  for (const [key] of entries) {
+    if (UNSAFE_PATH_KEYS.has(key)) throw new GatewayError("invalid_request", `passthrough key "${key}" is not allowed`, { provider: scope?.provider });
+    if (core?.has(key)) {
+      throw new GatewayError(
+        "invalid_request",
+        `passthrough key "${key}" is reserved by the ${scope!.wire} codec; set it through the typed request fields instead`,
+        { provider: scope!.provider }
+      );
+    }
+  }
+  for (const [key, value] of entries) {
+    const current = body[key];
+    body[key] = scope && isPlainObject(current) && isPlainObject(value) ? deepMerge(current, value) : value;
     warnings.push({ code: "passthrough", param: key, message: `${key} sent unvalidated via passthrough` });
+  }
+}
+
+/**
+ * `prompt_cache_key` is an OpenAI API field: only the OpenAI provider itself
+ * receives it (OpenRouter and other OpenAI-compatible providers do not document it).
+ */
+export function supportsPromptCacheKey(model: ResolvedModel): boolean {
+  return model.providerId === "openai";
+}
+
+/** System content as one string (wires without system block arrays). */
+export function systemText(content: string | TextBlock[]): string {
+  return typeof content === "string" ? content : content.map((block) => block.text).join("\n\n");
+}
+
+/** True when a message (or one of its text blocks) carries a cache breakpoint. */
+export function hasCacheMarker(message: ChatMessage): boolean {
+  if (message.cacheControl) return true;
+  return Array.isArray(message.content) && message.content.some((block) => block.type === "text" && block.cacheControl !== undefined);
+}
+
+/** Unified CacheControl → wire `cache_control` (Anthropic / OpenRouter share the shape). */
+export function wireCacheControl(cacheControl: CacheControl): Record<string, unknown> {
+  return cacheControl.ttl === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+}
+
+export const MAX_CACHE_BREAKPOINTS = 4;
+
+/**
+ * Enforce Anthropic's breakpoint rules on wire blocks in RENDER order
+ * (tools → system → messages): at most 4 (`cache_control` removed from the
+ * earliest extras), and a 1h breakpoint may not follow a 5m one (downgraded).
+ * Each adjustment emits a `cache_ignored` warning.
+ */
+export function enforceCacheBreakpoints(blocks: Array<Record<string, unknown>>, provider: string, warnings: Warning[]): void {
+  const marked = blocks.filter((block) => block.cache_control !== undefined);
+  const excess = marked.length - MAX_CACHE_BREAKPOINTS;
+  if (excess > 0) {
+    for (const block of marked.slice(0, excess)) delete block.cache_control;
+    warnings.push({
+      code: "cache_ignored",
+      param: "cacheControl",
+      message: `${provider} allows at most ${MAX_CACHE_BREAKPOINTS} cache breakpoints; dropped the ${excess} earliest`
+    });
+  }
+  let sawShort = false;
+  let downgraded = 0;
+  for (const block of marked.slice(Math.max(excess, 0))) {
+    const control = block.cache_control as { ttl?: string };
+    if (control.ttl === "1h" && sawShort) {
+      block.cache_control = { type: "ephemeral" };
+      downgraded++;
+    } else if (control.ttl !== "1h") {
+      sawShort = true;
+    }
+  }
+  if (downgraded > 0) {
+    warnings.push({
+      code: "cache_ignored",
+      param: "cacheControl",
+      message: `${downgraded} 1h cache breakpoint(s) after a 5m breakpoint downgraded to 5m (longer TTLs must come first)`
+    });
   }
 }

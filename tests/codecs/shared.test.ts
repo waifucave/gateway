@@ -70,6 +70,41 @@ describe("applyPassthrough", () => {
     ]);
   });
 
+  it("rejects core body keys with a clear invalid_request error (G3)", () => {
+    for (const key of ["model", "messages", "tools", "tool_choice", "stream", "stream_options", "response_format"]) {
+      const body: Record<string, unknown> = { model: "m", messages: [] };
+      const error = (() => {
+        try {
+          applyPassthrough(body, { [key]: "x" }, [], { wire: "openai-chat", provider: "deepseek" });
+        } catch (e) {
+          return e;
+        }
+      })() as GatewayError;
+      expect(error).toBeInstanceOf(GatewayError);
+      expect(error.kind).toBe("invalid_request");
+      expect(error.message).toContain(`"${key}"`);
+      expect(body).toEqual({ model: "m", messages: [] });
+    }
+    expect(() => applyPassthrough({}, { system: "x" }, [], { wire: "anthropic-messages", provider: "anthropic" })).toThrow(/reserved/);
+    expect(() => applyPassthrough({}, { contents: [] }, [], { wire: "google-generative-language", provider: "google-ai-studio" })).toThrow(/reserved/);
+    expect(() => applyPassthrough({}, { input: [] }, [], { wire: "openai-responses", provider: "openai" })).toThrow(/reserved/);
+  });
+
+  it("deep-merges object values into existing non-core keys instead of replacing them", () => {
+    const body: Record<string, unknown> = { generationConfig: { temperature: 0.5, thinkingConfig: { thinkingBudget: 10 } } };
+    const warnings: Warning[] = [];
+    applyPassthrough(body, { generationConfig: { thinkingConfig: { includeThoughts: true } }, cachedContent: "c1" }, warnings, {
+      wire: "google-generative-language",
+      provider: "google-ai-studio"
+    });
+    expect(body).toEqual({ generationConfig: { temperature: 0.5, thinkingConfig: { thinkingBudget: 10, includeThoughts: true } }, cachedContent: "c1" });
+    expect(warnings.map((w) => w.param)).toEqual(["generationConfig", "cachedContent"]);
+  });
+
+  it("rejects prototype-polluting keys", () => {
+    expect(() => applyPassthrough({}, JSON.parse('{"__proto__":{"x":1}}'), [], { wire: "openai-chat", provider: "x" })).toThrow(GatewayError);
+  });
+
   it("is a no-op for undefined passthrough", () => {
     const body: Record<string, unknown> = {};
     const warnings: Warning[] = [];

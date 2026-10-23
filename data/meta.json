@@ -6,6 +6,11 @@
     "company": "Meta",
     "routes": [
       {
+        "providerId": "meta",
+        "modelId": "muse-spark-1.1",
+        "wire": "openai-chat"
+      },
+      {
         "providerId": "openrouter",
         "modelId": "meta/muse-spark-1.1",
         "wire": "openai-chat",
@@ -50,10 +55,7 @@
     "modalities": {
       "input": [
         "text",
-        "image",
-        "video",
-        "file",
-        "audio"
+        "image"
       ],
       "output": [
         "text"
@@ -64,77 +66,591 @@
       "streamingUsage": false,
       "tools": {
         "supported": true,
-        "toolChoice": [],
-        "parallel": false,
-        "parallelDisable": false,
-        "strict": false
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
       },
       "structuredOutput": {
         "jsonMode": true,
         "jsonSchema": true,
-        "strict": false
+        "strict": true
       },
       "promptCaching": {
         "kind": "implicit"
       },
       "assistantPrefill": false,
       "systemRole": "system",
-      "multipleSystemMessages": false,
+      "multipleSystemMessages": true,
       "reasoningRoundTrip": false
     },
     "params": {
       "temperature": {
         "type": "number",
+        "min": 0,
+        "max": 2,
         "wireName": "temperature",
-        "confidence": "unverified"
+        "confidence": "verified"
       },
       "topP": {
         "type": "number",
+        "min": 0,
+        "max": 1,
         "wireName": "top_p",
-        "confidence": "unverified"
+        "confidence": "verified"
       },
       "maxOutputTokens": {
         "type": "int",
-        "wireName": "max_tokens",
-        "confidence": "unverified"
-      },
-      "responseFormat": {
-        "type": "enum",
-        "wireName": "response_format.type",
-        "confidence": "unverified",
-        "values": [
-          "text",
-          "json_object",
-          "json_schema"
-        ]
+        "min": 1,
+        "wireName": "max_completion_tokens",
+        "confidence": "verified"
       },
       "reasoning.effort": {
         "type": "enum",
-        "wireName": "reasoning.effort",
-        "confidence": "unverified",
         "values": [
           "minimal",
           "low",
           "medium",
           "high",
           "xhigh"
-        ]
+        ],
+        "wireName": "reasoning_effort",
+        "confidence": "verified"
+      },
+      "parallelToolCalls": {
+        "type": "boolean",
+        "wireName": "parallel_tool_calls",
+        "confidence": "verified"
       }
     },
-    "constraints": [],
+    "constraints": [
+      {
+        "id": "meta-positive-top-p",
+        "when": {
+          "param": "topP",
+          "eq": 0
+        },
+        "then": {
+          "forbid": [
+            "topP"
+          ]
+        },
+        "source": "https://dev.meta.ai/docs/protocols/chat-completions"
+      }
+    ],
     "meta": {
       "pricing": {
         "inputPerMTok": 1.25,
         "outputPerMTok": 4.25,
         "cachedInputPerMTok": 0.15
       },
-      "deprecated": false,
-      "availability": "OpenRouter route confirmed; direct provider route not yet audited",
+      "availability": "Standard tier: prompts and completions not used for training. Direct Chat Completions; text/image supported by this codec. Reasoning remains private; forced tools are unsupported. Also routed via OpenRouter (meta/muse-spark-1.1; route overlay carries OpenRouter's modalities, pricing and supportedParameters).",
       "sources": [
+        "https://dev.meta.ai/docs/models",
+        "https://dev.meta.ai/docs/protocols/chat-completions",
+        "https://dev.meta.ai/docs/reasoning",
+        "https://dev.meta.ai/docs/tool-calling",
+        "https://dev.meta.ai/docs/structured-output",
+        "https://dev.meta.ai/docs/pricing-rate-limits",
         "https://openrouter.ai/api/v1/models",
         "https://ai.meta.com/blog/introducing-muse-spark-meta-model-api/"
       ],
-      "verifiedAt": "2026-08-05",
+      "verifiedAt": "2026-10-12",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "muse-spark-1-2",
+    "displayName": "Muse Spark 1.2",
+    "company": "Meta",
+    "routes": [
+      {
+        "providerId": "meta",
+        "modelId": "muse-spark-1.2",
+        "wire": "openai-chat"
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "min": 0,
+        "max": 2,
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "min": 1,
+        "wireName": "max_completion_tokens",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "wireName": "reasoning_effort",
+        "confidence": "verified"
+      },
+      "parallelToolCalls": {
+        "type": "boolean",
+        "wireName": "parallel_tool_calls",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "meta-positive-top-p",
+        "when": {
+          "param": "topP",
+          "eq": 0
+        },
+        "then": {
+          "forbid": [
+            "topP"
+          ]
+        },
+        "source": "https://dev.meta.ai/docs/protocols/chat-completions"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 4.25,
+        "cachedInputPerMTok": 0.15
+      },
+      "availability": "Standard tier: prompts and completions not used for training. Direct Chat Completions; text/image supported by this codec. Reasoning remains private; forced tools are unsupported.",
+      "sources": [
+        "https://dev.meta.ai/docs/models",
+        "https://dev.meta.ai/docs/protocols/chat-completions",
+        "https://dev.meta.ai/docs/reasoning",
+        "https://dev.meta.ai/docs/tool-calling",
+        "https://dev.meta.ai/docs/structured-output",
+        "https://dev.meta.ai/docs/pricing-rate-limits"
+      ],
+      "verifiedAt": "2026-10-12",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "muse-spark-1-2-contributor",
+    "displayName": "Muse Spark 1.2 (Contributor — training enabled)",
+    "company": "Meta",
+    "routes": [
+      {
+        "providerId": "meta",
+        "modelId": "muse-spark-1.2-contributor",
+        "wire": "openai-chat"
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "min": 0,
+        "max": 2,
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "min": 1,
+        "wireName": "max_completion_tokens",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "wireName": "reasoning_effort",
+        "confidence": "verified"
+      },
+      "parallelToolCalls": {
+        "type": "boolean",
+        "wireName": "parallel_tool_calls",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "meta-positive-top-p",
+        "when": {
+          "param": "topP",
+          "eq": 0
+        },
+        "then": {
+          "forbid": [
+            "topP"
+          ]
+        },
+        "source": "https://dev.meta.ai/docs/protocols/chat-completions"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.1,
+        "outputPerMTok": 0.2,
+        "cachedInputPerMTok": 0.002
+      },
+      "availability": "Contributor permits Meta to train on prompts and completions. Direct Chat Completions; text/image supported by this codec. Reasoning remains private; forced tools are unsupported.",
+      "sources": [
+        "https://dev.meta.ai/docs/models",
+        "https://dev.meta.ai/docs/protocols/chat-completions",
+        "https://dev.meta.ai/docs/reasoning",
+        "https://dev.meta.ai/docs/tool-calling",
+        "https://dev.meta.ai/docs/structured-output",
+        "https://dev.meta.ai/docs/pricing-rate-limits"
+      ],
+      "verifiedAt": "2026-10-12",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "muse-spark-1-3",
+    "displayName": "Muse Spark 1.3",
+    "company": "Meta",
+    "routes": [
+      {
+        "providerId": "meta",
+        "modelId": "muse-spark-1.3",
+        "wire": "openai-chat"
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "min": 0,
+        "max": 2,
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "min": 1,
+        "wireName": "max_completion_tokens",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "wireName": "reasoning_effort",
+        "confidence": "verified"
+      },
+      "parallelToolCalls": {
+        "type": "boolean",
+        "wireName": "parallel_tool_calls",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "meta-positive-top-p",
+        "when": {
+          "param": "topP",
+          "eq": 0
+        },
+        "then": {
+          "forbid": [
+            "topP"
+          ]
+        },
+        "source": "https://dev.meta.ai/docs/protocols/chat-completions"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 4.25,
+        "cachedInputPerMTok": 0.15
+      },
+      "availability": "Standard tier: prompts and completions not used for training. Direct Chat Completions; text/image supported by this codec. Reasoning remains private; forced tools are unsupported.",
+      "sources": [
+        "https://dev.meta.ai/docs/models",
+        "https://dev.meta.ai/docs/protocols/chat-completions",
+        "https://dev.meta.ai/docs/reasoning",
+        "https://dev.meta.ai/docs/tool-calling",
+        "https://dev.meta.ai/docs/structured-output",
+        "https://dev.meta.ai/docs/pricing-rate-limits"
+      ],
+      "verifiedAt": "2026-10-12",
+      "confidence": "partial"
+    }
+  },
+  {
+    "schema": "starlight.capability-doc.v1",
+    "family": "muse-spark-1-3-contributor",
+    "displayName": "Muse Spark 1.3 (Contributor — training enabled)",
+    "company": "Meta",
+    "routes": [
+      {
+        "providerId": "meta",
+        "modelId": "muse-spark-1.3-contributor",
+        "wire": "openai-chat"
+      }
+    ],
+    "limits": {
+      "contextTokens": 1048576,
+      "maxOutputTokens": 0
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    },
+    "features": {
+      "streaming": true,
+      "streamingUsage": false,
+      "tools": {
+        "supported": true,
+        "toolChoice": [
+          "auto"
+        ],
+        "parallel": true,
+        "parallelDisable": true,
+        "strict": true
+      },
+      "structuredOutput": {
+        "jsonMode": true,
+        "jsonSchema": true,
+        "strict": true
+      },
+      "promptCaching": {
+        "kind": "implicit"
+      },
+      "assistantPrefill": false,
+      "systemRole": "system",
+      "multipleSystemMessages": true,
+      "reasoningRoundTrip": false
+    },
+    "params": {
+      "temperature": {
+        "type": "number",
+        "min": 0,
+        "max": 2,
+        "wireName": "temperature",
+        "confidence": "verified"
+      },
+      "topP": {
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "wireName": "top_p",
+        "confidence": "verified"
+      },
+      "maxOutputTokens": {
+        "type": "int",
+        "min": 1,
+        "wireName": "max_completion_tokens",
+        "confidence": "verified"
+      },
+      "reasoning.effort": {
+        "type": "enum",
+        "values": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "wireName": "reasoning_effort",
+        "confidence": "verified"
+      },
+      "parallelToolCalls": {
+        "type": "boolean",
+        "wireName": "parallel_tool_calls",
+        "confidence": "verified"
+      }
+    },
+    "constraints": [
+      {
+        "id": "meta-positive-top-p",
+        "when": {
+          "param": "topP",
+          "eq": 0
+        },
+        "then": {
+          "forbid": [
+            "topP"
+          ]
+        },
+        "source": "https://dev.meta.ai/docs/protocols/chat-completions"
+      }
+    ],
+    "meta": {
+      "pricing": {
+        "inputPerMTok": 0.1,
+        "outputPerMTok": 0.2,
+        "cachedInputPerMTok": 0.002
+      },
+      "availability": "Contributor permits Meta to train on prompts and completions. Direct Chat Completions; text/image supported by this codec. Reasoning remains private; forced tools are unsupported.",
+      "sources": [
+        "https://dev.meta.ai/docs/models",
+        "https://dev.meta.ai/docs/protocols/chat-completions",
+        "https://dev.meta.ai/docs/reasoning",
+        "https://dev.meta.ai/docs/tool-calling",
+        "https://dev.meta.ai/docs/structured-output",
+        "https://dev.meta.ai/docs/pricing-rate-limits"
+      ],
+      "verifiedAt": "2026-10-12",
       "confidence": "partial"
     }
   }

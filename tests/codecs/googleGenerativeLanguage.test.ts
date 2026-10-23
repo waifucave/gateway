@@ -208,7 +208,8 @@ describe("google decodeResponse", () => {
         { type: "toolCall", id: "call_0", name: "lookup", arguments: '{"q":"x"}' }
       ],
       finishReason: "tool_calls", // STOP + functionCall present
-      usage: { inputTokens: 8, outputTokens: 4, reasoningTokens: 2, cachedInputTokens: 3 },
+      // outputTokens includes thoughts: candidates 4 + thoughts 2 (G10)
+      usage: { inputTokens: 8, outputTokens: 6, reasoningTokens: 2, cacheReadTokens: 3, cachedInputTokens: 3 },
       warnings: []
     });
   });
@@ -273,6 +274,55 @@ describe("google decodeStream", () => {
         }
       }
     ]);
+  });
+
+  it("captures thoughtSignature on streamed functionCall parts and round-trips it (G5)", async () => {
+    const events = await collect(
+      googleGenerativeLanguageCodec.decodeStream(
+        model,
+        sse([
+          {
+            data: JSON.stringify({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      { functionCall: { name: "lookup", args: { q: "x" } }, thoughtSignature: "sig_stream_1" },
+                      { functionCall: { name: "other", args: {} } }
+                    ]
+                  },
+                  finishReason: "STOP"
+                }
+              ],
+              usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 }
+            })
+          }
+        ])
+      )
+    );
+    const done = events.at(-1);
+    expect(done?.type).toBe("done");
+    if (done?.type !== "done") return;
+    expect(done.response.content).toEqual([
+      { type: "toolCall", id: "call_0", name: "lookup", arguments: '{"q":"x"}', signature: "sig_stream_1" },
+      { type: "toolCall", id: "call_1", name: "other", arguments: "{}" }
+    ]);
+    // replaying the streamed turn sends the REAL signature back, not the injected dummy
+    const encoded = googleGenerativeLanguageCodec.encode(
+      model,
+      {
+        messages: [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: done.response.content as never },
+          { role: "tool", toolCallId: "call_0", content: "{}" }
+        ],
+        effectiveParams: {},
+        stream: false
+      },
+      "K"
+    );
+    const modelTurn = (encoded.body.contents as Array<{ parts: Array<Record<string, unknown>> }>)[1]!;
+    expect(modelTurn.parts[0]!.thoughtSignature).toBe("sig_stream_1");
   });
 
   it("throws GatewayError on malformed chunks", async () => {

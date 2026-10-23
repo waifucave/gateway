@@ -6,7 +6,7 @@ export type HttpOptions = {
   fetchImpl?: typeof fetch;
   /** Time to response HEADERS (not whole stream). Default 120s. */
   timeoutMs?: number;
-  /** Retries after the first attempt, on 429/5xx/network errors. Default 2. */
+  /** Retries after the first attempt, on rate-limit 429s/5xx/network errors (never quota/billing). Default 2. */
   maxRetries?: number;
   /** Base backoff delay; doubles per attempt, with jitter. Default 500ms (set 1 in tests). */
   retryBaseDelayMs?: number;
@@ -96,8 +96,16 @@ export async function fetchWithRetry(provider: string, request: HttpRequest, opt
     if (response.ok) return response; // keep the user-abort wiring alive for body consumption
 
     options.signal?.removeEventListener("abort", onAbort);
-    const retryable = response.status === 429 || response.status >= 500;
-    if (retryable && attempt < maxRetries) {
+    // 429s are classified from the body BEFORE deciding to retry: a quota or
+    // billing exhaustion (insufficient_quota, credit balance, per-day quota)
+    // is terminal and backoff only delays the truth.
+    if (response.status === 429) {
+      const error = GatewayError.fromHttp(provider, response.status, await parseBody(response));
+      if (!error.retryable || attempt >= maxRetries) throw error;
+      await sleep(retryDelayMs(attempt, base, response), options.signal);
+      continue;
+    }
+    if (response.status >= 500 && attempt < maxRetries) {
       await response.body?.cancel().catch(() => {});
       await sleep(retryDelayMs(attempt, base, response), options.signal);
       continue;
